@@ -93,12 +93,16 @@ const CopySection: React.FC<{ title: string; content: string; icon: string }> = 
   );
 };
 
+// reference_based追加: プロンプトバージョンの型定義
+type PromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'reference_based';
+
 const ServiceResult: React.FC<ServiceResultProps> = ({
   idea, content, thumbnailUrl, onGenerateImage, isHighQuality, setIsHighQuality, onReset, onBack
 }) => {
   const [isAllCopied, setIsAllCopied] = useState(false);
-  const [expandedPrompt, setExpandedPrompt] = useState<'standard' | 'simple' | 'watercolor' | 'pop' | null>(null);
-  const [copiedVersion, setCopiedVersion] = useState<'standard' | 'simple' | 'watercolor' | 'pop' | null>(null);
+  // reference_based追加: expandedPrompt と copiedVersion の型を PromptVersion に拡張
+  const [expandedPrompt, setExpandedPrompt] = useState<PromptVersion | null>(null);
+  const [copiedVersion, setCopiedVersion] = useState<PromptVersion | null>(null);
   const [showTip, setShowTip] = useState(false);
 
   const parsed = useMemo(() => parseServiceContent(content), [content]);
@@ -108,6 +112,8 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
   const simplePrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'simple'), [promptCtx]);
   const watercolorPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'watercolor'), [promptCtx]);
   const popPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'pop'), [promptCtx]);
+  // reference_based追加: reference_based プロンプトを生成
+  const referenceBasedPrompt = useMemo(() => getThumbnailPrompt(promptCtx, true, 'reference_based'), [promptCtx]);
 
   const handleCopyAll = () => {
     navigator.clipboard.writeText(content).then(() => {
@@ -116,8 +122,15 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
     });
   };
 
-  const handleCopyPrompt = (version: 'standard' | 'simple' | 'watercolor' | 'pop') => {
-    const promptMap = { standard: standardPrompt, simple: simplePrompt, watercolor: watercolorPrompt, pop: popPrompt };
+  // reference_based追加: handleCopyPrompt の型を PromptVersion に拡張
+  const handleCopyPrompt = (version: PromptVersion) => {
+    const promptMap: Record<PromptVersion, string> = {
+      standard: standardPrompt,
+      simple: simplePrompt,
+      watercolor: watercolorPrompt,
+      pop: popPrompt,
+      reference_based: referenceBasedPrompt, // reference_based追加
+    };
     navigator.clipboard.writeText(promptMap[version]).then(() => {
       setCopiedVersion(version);
       setTimeout(() => setCopiedVersion(null), 2000);
@@ -386,7 +399,7 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                       <path d="M90,325 Q120,310 150,325" fill="#bbf7d0" opacity="0.5"/>
                       <ellipse cx="420" cy="270" rx="110" ry="22" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1"/>
                       <ellipse cx="420" cy="330" rx="110" ry="22" fill="#fef3c7" stroke="#fcd34d" strokeWidth="1"/>
-                      <rect x="30" y="388" width="540" height="5" rx="2.5" fill="#e7e5e4"/>
+                      <rect x="30" y="388" width="540" height="4" rx="2" fill="#e7e5e4"/>
                     </svg>
                     <button
                       onClick={() => handleCopyPrompt('simple')}
@@ -520,6 +533,83 @@ const ServiceResult: React.FC<ServiceResultProps> = ({
                     </pre>
                   )}
                 </div>
+
+                {/* reference_based追加: 参考画像から生成プロンプトカード */}
+                <div className="bg-white border-2 border-indigo-200 rounded-2xl p-5 space-y-3 relative overflow-hidden">
+                  {/* reference_based追加: 背景アクセント */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/60 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none"></div>
+                  <div className="relative z-10 flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      {/* reference_based追加: バッジ */}
+                      <div className="flex items-center gap-2 mb-1">
+                        <h6 className="text-sm font-bold text-stone-700">参考画像から生成</h6>
+                        <span className="inline-block px-2 py-0.5 text-[9px] font-bold tracking-widest uppercase rounded-full bg-indigo-100 text-indigo-600 border border-indigo-200">
+                          NEW
+                        </span>
+                      </div>
+                      {/* reference_based追加: モード説明文 */}
+                      <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">
+                        参考にしたいサムネイル画像をGeminiに一緒に添付することで、そのデザインを踏襲した新しいサムネイルを生成できます。アイコンや文章は新しいサービス内容に自動で差し替えられます。
+                      </p>
+                    </div>
+                    {/* reference_based追加: サムネイルプレビュー（参考画像イメージ） */}
+                    <svg viewBox="0 0 600 400" className="w-[100px] shrink-0 rounded-md block border border-indigo-100">
+                      <defs>
+                        <linearGradient id="refBg" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#eef2ff"/>
+                          <stop offset="100%" stopColor="#e0e7ff"/>
+                        </linearGradient>
+                      </defs>
+                      <rect fill="url(#refBg)" width="600" height="400" rx="12"/>
+                      {/* 参考画像を示す破線フレーム */}
+                      <rect x="20" y="20" width="560" height="360" rx="8" fill="none" stroke="#a5b4fc" strokeWidth="3" strokeDasharray="12 6"/>
+                      {/* 参考画像アイコン */}
+                      <rect x="220" y="130" width="160" height="110" rx="10" fill="#c7d2fe" opacity="0.7"/>
+                      <polygon points="300,155 330,200 270,200" fill="#818cf8" opacity="0.8"/>
+                      <circle cx="260" cy="165" r="12" fill="#818cf8" opacity="0.6"/>
+                      {/* 矢印（参考→生成） */}
+                      <text x="300" y="290" textAnchor="middle" fontSize="28" fill="#6366f1" opacity="0.7">↓</text>
+                      <text x="300" y="340" textAnchor="middle" fontSize="18" fill="#6366f1" opacity="0.6" fontWeight="bold">NEW</text>
+                    </svg>
+                    {/* reference_based追加: コピーボタン */}
+                    <button
+                      onClick={() => handleCopyPrompt('reference_based')}
+                      className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all shrink-0 ${
+                        copiedVersion === 'reference_based'
+                          ? 'bg-green-100 text-green-700 border-green-200'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-500 border-indigo-600 shadow-sm'
+                      }`}
+                    >
+                      {copiedVersion === 'reference_based' ? '✅ コピー済' : '📋 コピー'}
+                    </button>
+                  </div>
+
+                  {/* reference_based追加: コピー後の案内バナー */}
+                  {copiedVersion === 'reference_based' && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                      <span className="text-indigo-500 text-base shrink-0 mt-0.5">💡</span>
+                      <p className="text-xs text-indigo-700 font-medium leading-relaxed">
+                        コピー後、Geminiを開いて参考画像と一緒に貼り付けてください。
+                      </p>
+                    </div>
+                  )}
+
+                  {/* reference_based追加: プロンプト展開ボタン */}
+                  <button
+                    onClick={() => setExpandedPrompt(expandedPrompt === 'reference_based' ? null : 'reference_based')}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-stone-400 hover:text-stone-600 transition-colors"
+                  >
+                    <span className={`transition-transform duration-200 ${expandedPrompt === 'reference_based' ? 'rotate-180' : ''}`}>▾</span>
+                    プロンプトを表示
+                  </button>
+                  {expandedPrompt === 'reference_based' && (
+                    <pre className="text-xs font-mono text-stone-500 bg-stone-50 p-4 rounded-xl whitespace-pre-wrap leading-relaxed border border-stone-100 overflow-y-auto max-h-[200px] custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200">
+                      {referenceBasedPrompt}
+                    </pre>
+                  )}
+                </div>
+                {/* /reference_based追加 */}
+
               </div>
             </div>
           </div>

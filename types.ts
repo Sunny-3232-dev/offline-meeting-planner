@@ -50,4 +50,5 @@ export interface SurveyPattern {
 }
 
 // Thumbnail Prompt Version
-export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop';
+// reference_based追加
+export type ThumbnailPromptVersion = 'standard' | 'simple' | 'watercolor' | 'pop' | 'reference_based';
