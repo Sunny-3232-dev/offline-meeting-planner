@@ -65,12 +65,20 @@ export default function ScheduleStep({
       {schedule.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center mb-6">
           <p className="text-sm text-slate-500 mb-4">まだ進行イメージがありません</p>
-          <button
-            onClick={() => onRegenerate('')}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition-colors"
-          >
-            AIに進行イメージを作ってもらう
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              onClick={() => onRegenerate('')}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition-colors"
+            >
+              AIに進行イメージを作ってもらう
+            </button>
+            <button
+              onClick={onNext}
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-white border border-slate-300 text-slate-500 text-sm font-medium hover:bg-slate-50 transition-colors"
+            >
+              スケジュールなしで進む（あとで追加できます）
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-2 mb-4">
@@ -87,7 +95,7 @@ export default function ScheduleStep({
                       type="number"
                       min={1}
                       max={180}
-                      step={5}
+                      step={10}
                       value={item.durationMinutes}
                       onChange={(e) => update(item.id, { durationMinutes: Math.max(1, Number(e.target.value) || 1) })}
                       aria-label="所要時間（分）"
@@ -207,14 +215,15 @@ export default function ScheduleStep({
             基本情報に戻る
           </button>
         </div>
-        <button
-          onClick={onNext}
-          disabled={schedule.length === 0}
-          className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-sky-600 text-white font-semibold hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-lg shadow-sky-600/20"
-        >
-          詳細（公開情報）を作る
-          <ArrowRightIcon size={18} />
-        </button>
+        {schedule.length > 0 && (
+          <button
+            onClick={onNext}
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-full bg-sky-600 text-white font-semibold hover:bg-sky-700 transition-colors shadow-lg shadow-sky-600/20"
+          >
+            詳細（公開情報）を作る
+            <ArrowRightIcon size={18} />
+          </button>
+        )}
       </div>
     </div>
   );

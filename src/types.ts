@@ -76,7 +76,8 @@ export interface ScheduleItem {
 }
 
 export interface IconPromptResult {
-  keywords: string[];
+  /** アイコンに大きく載せる短いワード */
+  word: string;
   prompt: string;
   styleNote: string;
 }

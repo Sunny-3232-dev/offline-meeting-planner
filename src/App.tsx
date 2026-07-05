@@ -39,7 +39,7 @@ import {
   generateThumbnailAssets,
   generateShareTexts,
 } from './services/geminiService';
-import { computeTimeRanges, formatDateJa } from './utils/time';
+import { formatDateJa, syncTimetableSection } from './utils/time';
 import { MAX_PINNED_IDEAS, MAX_SAVED_EVENTS, officeLabel } from './constants';
 import StepIndicator, { stepOrder } from './components/StepIndicator';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -109,18 +109,13 @@ function basicsFingerprint(basics: EventBasics): string {
 function conceptFingerprint(concept: IdeaConcept | null): string {
   return concept ? JSON.stringify(concept) : '';
 }
-function scheduleFingerprint(schedule: ScheduleItem[]): string {
-  return schedule.map((s) => `${s.title}|${s.durationMinutes}`).join(',');
-}
 function basicsConceptFingerprint(basics: EventBasics, concept: IdeaConcept | null): string {
   return `${basicsFingerprint(basics)}|${conceptFingerprint(concept)}`;
 }
-function announcementSourceFingerprint(
-  basics: EventBasics,
-  concept: IdeaConcept | null,
-  schedule: ScheduleItem[]
-): string {
-  return `${basicsFingerprint(basics)}|${conceptFingerprint(concept)}|${scheduleFingerprint(schedule)}`;
+// 詳細（公開情報）の「作り直しますか？」判定は基本情報・コンセプトの変更のみで行う。
+// スケジュール変更は「■当日の流れ」の機械差し替えのみで対応するため指紋から除外する。
+function announcementSourceFingerprint(basics: EventBasics, concept: IdeaConcept | null): string {
+  return basicsConceptFingerprint(basics, concept);
 }
 function shareSourceFingerprint(basics: EventBasics, announcement: string, regionHint: string): string {
   return `${basicsFingerprint(basics)}|${announcement}|${regionHint}`;
@@ -240,6 +235,20 @@ function AppContent() {
 
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
+
+  // 詳細（公開情報）ステップに入るたびに「■当日の流れ」を最新スケジュールへ機械同期する。
+  // ステップナビ（チップ）で直接ジャンプした場合も同期されるようにする（onNext経由でない導線の穴を塞ぐ）。
+  // syncTimetableSection は冪等なので、既に同期済みなら prev をそのまま返して再レンダーを避ける。
+  useEffect(() => {
+    if (step === AppStep.ANNOUNCEMENT && announcement) {
+      setAnnouncement((prev) => {
+        const synced = syncTimetableSection(prev, basics, schedule);
+        return synced === prev ? prev : synced;
+      });
+    }
+    // step変更時のみ発火させたいので依存はstepのみ（basics/scheduleは発火時点の最新を参照）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Close API key dropdown on outside click / Esc
   useEffect(() => {
@@ -526,12 +535,11 @@ function AppContent() {
         basics,
         schedule,
         formatDateJa(basics.date),
-        computeTimeRanges(basics.startTime, schedule),
         feedback
       );
       setAnnouncement(result.body);
       setEventTags(result.tags);
-      setAnnouncementSourceKey(announcementSourceFingerprint(basics, concept, schedule));
+      setAnnouncementSourceKey(announcementSourceFingerprint(basics, concept));
     } catch (e: any) {
       setError(e?.message || '詳細（公開情報）の生成に失敗しました。');
     } finally {
@@ -796,21 +804,34 @@ function AppContent() {
             onChange={setSchedule}
             onRegenerate={(feedback) => runGenerateSchedule({ confirm: true, feedback })}
             onNext={async () => {
-              // 基本情報・進行イメージを変更した後だと、既存の詳細文は前提が食い違っている可能性がある
-              const currentKey = announcementSourceFingerprint(basics, concept, schedule);
-              const stale =
-                !!announcement && announcementSourceKey !== '' && currentKey !== announcementSourceKey;
-              if (stale) {
-                const ok = await confirmDialog(
-                  '基本情報・進行イメージが変更されています。詳細（公開情報）を作り直しますか？'
-                );
-                if (ok) {
-                  runGenerateAnnouncement('');
-                } else {
-                  setAnnouncementSourceKey(currentKey);
-                }
-              } else if (!announcement) {
+              if (!announcement) {
+                // 詳細（公開情報）が未生成 → 従来通りAIで生成（schedule込み、■当日の流れ挿入済み）
                 runGenerateAnnouncement('');
+              } else {
+                // 基本情報・コンセプトを変更した後だと、既存の詳細文は前提が食い違っている可能性がある
+                const currentKey = announcementSourceFingerprint(basics, concept);
+                // 旧バージョン（schedule込み指紋）のannouncementSourceKeyは
+                // 新フォーマット（basicsConcept指紋）を前方一致で含むため、それも一致とみなす
+                // （バージョン移行直後にscheduleだけの変更を誤って「基本情報変更」と検知しないための互換対応）
+                const isLegacyMatch = announcementSourceKey.startsWith(`${currentKey}|`);
+                const stale =
+                  announcementSourceKey !== '' && currentKey !== announcementSourceKey && !isLegacyMatch;
+                if (stale) {
+                  const ok = await confirmDialog(
+                    '基本情報が変更されています。詳細（公開情報）を作り直しますか？'
+                  );
+                  if (ok) {
+                    runGenerateAnnouncement('');
+                  } else {
+                    setAnnouncementSourceKey(currentKey);
+                    // 作り直さない場合も「■当日の流れ」だけは最新のscheduleに機械同期する
+                    setAnnouncement(syncTimetableSection(announcement, basics, schedule));
+                  }
+                } else {
+                  // 基本情報・コンセプトは変わっていない（scheduleだけの変更等）
+                  // → AIは呼ばず「■当日の流れ」だけを機械差し替え
+                  setAnnouncement(syncTimetableSection(announcement, basics, schedule));
+                }
               }
               goToStep(AppStep.ANNOUNCEMENT);
             }}

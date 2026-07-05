@@ -13,6 +13,30 @@ interface ImagePromptStepProps {
   onBack: () => void;
 }
 
+/** 告知サムネイルのトンマナプリセット（クライアント定義。共通ベース(imagePrompt)に版別スタイルを合成する） */
+const THUMBNAIL_TONES = [
+  {
+    key: 'photo',
+    label: '実写風',
+    style:
+      '\n\n■ 画風：写真のようにリアルな実写風。自然光と本物のような質感で、臨場感のある仕上がりに。',
+  },
+  {
+    key: 'illust',
+    label: 'やわらかイラスト',
+    style:
+      '\n\n■ 画風：手描き風のあたたかいイラスト。やさしい色使いと親しみやすいタッチで。',
+  },
+  {
+    key: 'pop',
+    label: 'ポップ',
+    style:
+      '\n\n■ 画風：ポップでフラットなデザイン。はっきりした配色とシンプルな形で、明るく元気な印象に。',
+  },
+] as const;
+
+type ThumbnailToneKey = (typeof THUMBNAIL_TONES)[number]['key'];
+
 function CopyButton({ text, label = 'コピー' }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -82,6 +106,11 @@ export default function ImagePromptStep({
   onNext,
   onBack,
 }: ImagePromptStepProps) {
+  const [selectedTone, setSelectedTone] = useState<ThumbnailToneKey>('photo');
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const activeTone = THUMBNAIL_TONES.find((t) => t.key === selectedTone) || THUMBNAIL_TONES[0];
+  const fullThumbnailPrompt = thumbnailAssets ? thumbnailAssets.imagePrompt + activeTone.style : '';
+
   return (
     <div className="max-w-2xl mx-auto py-8 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2">
@@ -106,6 +135,11 @@ export default function ImagePromptStep({
               <h4 className="text-sm font-bold text-slate-700">チャットアイコン生成プロンプト</h4>
               <CopyButton text={iconPrompt.prompt} label="プロンプトをコピー" />
             </div>
+            {iconPrompt.word && (
+              <p className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-100 rounded-full px-3 py-1 mb-3">
+                アイコン文字: {iconPrompt.word}
+              </p>
+            )}
             <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap break-words mb-3">
               {iconPrompt.prompt}
             </p>
@@ -145,11 +179,40 @@ export default function ImagePromptStep({
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-sm font-bold text-slate-700">サムネイル生成プロンプト</h4>
-              <CopyButton text={thumbnailAssets.imagePrompt} label="プロンプトをコピー" />
+              <CopyButton text={fullThumbnailPrompt} label={`${activeTone.label}のプロンプトをコピー`} />
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap break-words mb-3">
-              {thumbnailAssets.imagePrompt}
-            </p>
+
+            {/* トンマナ選択ピル */}
+            <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="サムネイルのトンマナ">
+              {THUMBNAIL_TONES.map((tone) => (
+                <button
+                  key={tone.key}
+                  type="button"
+                  onClick={() => setSelectedTone(tone.key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    selectedTone === tone.key
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300 hover:text-sky-600'
+                  }`}
+                >
+                  {tone.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setPromptExpanded((v) => !v)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors mb-2"
+            >
+              <span className={`transition-transform duration-200 ${promptExpanded ? 'rotate-180' : ''}`}>▾</span>
+              プロンプトを表示
+            </button>
+            {promptExpanded && (
+              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap break-words mb-3">
+                {fullThumbnailPrompt}
+              </p>
+            )}
+
             <p className="text-xs text-slate-400 mb-3 flex items-center gap-1">
               <LightbulbIcon size={13} className="shrink-0" />
               キャッチーなタイトル・日時・場所は、この画像の中に文字として描き込まれる想定です
@@ -161,7 +224,7 @@ export default function ImagePromptStep({
                 className="inline-flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-800 disabled:opacity-50 transition-colors"
               >
                 <RefreshIcon size={13} />
-                {thumbnailLoading ? '作り直しています...' : 'プロンプトを作り直す'}
+                {thumbnailLoading ? '作り直しています...' : '作り直す'}
               </button>
             </div>
           </div>

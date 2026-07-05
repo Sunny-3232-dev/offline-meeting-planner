@@ -13,6 +13,7 @@ import type {
   ShareTexts,
   AnnouncementResult,
 } from '../types';
+import { syncTimetableSection } from '../utils/time';
 
 const MODEL = 'gemini-2.5-flash';
 const MAX_RETRIES = 3;
@@ -532,13 +533,8 @@ export async function generateAnnouncement(
   basics: EventBasics,
   schedule: ScheduleItem[],
   formattedDate: string,
-  timeRanges: string[],
   feedback?: string
 ): Promise<AnnouncementResult> {
-  const scheduleText = schedule
-    .map((s, i) => `${timeRanges[i] || ''} ${s.title}`)
-    .join('\n');
-
   const feedbackSection =
     feedback && feedback.trim()
       ? `\n## 書き直しの要望（必ず反映すること・最優先で従うこと）\n${feedback.trim()}\n`
@@ -557,18 +553,16 @@ export async function generateAnnouncement(
 - 定員: ${basics.capacity}人（主催者含む）
 ${conceptLines(concept)}
 
-## 当日の流れ
-${scheduleText}
-
 ## 主催者について
 ${profile.selfIntro}
 ${feedbackSection}
 ## 告知文（body）の構成（必ずこのテンプレート構成で出力すること）
 以下の見出し（■・▶）と改行構成を必ずそのまま使い、各セクションの中身だけを埋めてください。
+「■当日の流れ」セクションは含めないでください（別途システム側で自動挿入します）。
 
 \`\`\`
 ■イベント・オフ会内容
-（会の紹介: 挨拶・自己紹介・どんな会か・こんな人に来てほしい・日時・場所・定員・当日の流れを、このセクション内に読みやすくまとめる。挨拶と自己紹介は1〜2文で初主催であることを正直に親しみやすく、どんな会かは目的・大切にしたいことを自然な文章で、こんな人に来てほしいはペルソナをやわらかい表現で、開催概要は日時・場所・定員を見やすく、当日の流れはタイムテーブルを含める）
+（会の紹介: 挨拶・自己紹介・どんな会か・こんな人に来てほしい・日時・場所・定員を、このセクション内に読みやすくまとめる。挨拶と自己紹介は1〜2文で初主催であることを正直に親しみやすく、どんな会かは目的・大切にしたいことを自然な文章で、こんな人に来てほしいはペルソナをやわらかい表現で、開催概要は日時・場所・定員を見やすくまとめる。当日の流れ・タイムテーブルはここに書かないこと）
 
 ■参加費用（内訳があれば明記してください）
 （${basics.venueType === 'offline' ? '対面なら「実費（カフェ代等は各自ご負担）」のような想定を書き、主催者が編集しやすい形にすること' : 'オンラインなら「無料」等、実態に即した内容にすること'}）
@@ -590,7 +584,7 @@ https://site.libecity.com/meetup-guidelines
 - 各見出し（■参加費用 等）はそのまま残し、中身だけを埋めること
 
 ## 注意事項
-- ■イベント・オフ会内容セクションは全体で600〜900文字程度
+- ■イベント・オフ会内容セクションは全体で500〜800文字程度
 - 絵文字を適度に使い、堅くなりすぎないこと
 - 「初めての方も大歓迎」の空気を作ること
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください。
@@ -617,8 +611,10 @@ https://site.libecity.com/meetup-guidelines
   const tags: string[] = Array.isArray(parsed?.tags)
     ? parsed.tags.map(String).filter(Boolean).slice(0, 8)
     : [];
+  // 「■当日の流れ」はAIに書かせず、コード側で機械挿入する
+  const bodyWithTimetable = syncTimetableSection(ensureGuidelineFooter(body), basics, schedule);
   return {
-    body: ensureGuidelineFooter(body),
+    body: bodyWithTimetable,
     tags,
   };
 }
@@ -627,20 +623,14 @@ https://site.libecity.com/meetup-guidelines
 // 6. generateIconPrompt — 円形オフ会アイコン用プロンプト
 //    AIにはキーワードだけを考えさせ、プロンプト文の組み立てはコード側で行う
 // ============================================================
-const ICON_KEYWORD_COUNT = 6;
-
-function buildIconPrompt(keywords: string[]): string {
-  const list = keywords.filter(Boolean).join('、');
-  return `あなたはプロのデザイナーです。以下のキーワードをもとに、円形のオフ会アイコンをデザインしてください。
-
-キーワード: ${list}
-
-条件:
-・完全な円形のアイコン（丸くクロップされた構図、背景は白または透過）
-・文字は入れない（文字化けを防ぐため）
-・中央にモチーフを大きく配置
-・フラットで親しみやすいイラストスタイル
-・SNSアイコンとして小さく表示されても内容がわかるシンプルさ`;
+/** 円形チャットアイコン用プロンプトの組み立て（シンプル背景＋大きな文字が主役） */
+export function buildIconPrompt(word: string): string {
+  return `あなたはプロのデザイナーです。オフ会のSNS用チャットアイコンをデザインしてください。
+・完全な円形のアイコン
+・背景はシンプル（無地〜ゆるやかなグラデーション。細かい描写・イラストは入れない）
+・中央に「${word}」という文字を大きく・はっきり・読みやすく配置（文字がアイコンの主役）
+・小さく表示されても一目で読める視認性とコントラスト
+・装飾は最小限。ごちゃつかせない`;
 }
 
 export async function generateIconPrompt(
@@ -650,36 +640,34 @@ export async function generateIconPrompt(
   basics: EventBasics
 ): Promise<IconPromptResult> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
-オフ会の「円形アイコン」のデザインに使う、視覚的なキーワードを${ICON_KEYWORD_COUNT}個抽出してください（文章ではなく単語・短いフレーズのみ）。
+オフ会の「円形アイコン」の中央に大きく載せる、そのオフ会を最も表す短いワードを1つだけ選んでください。
 
 ## オフ会の情報
 - タイトル: ${basics.title}
 - 内容: ${idea.summary}
 - 雰囲気: ${concept.cherish.join('、')}
 
-## キーワードの条件
-- 1〜2単語程度の短いキーワードにすること（説明文にしない）
-- モチーフ・シンボル・色・雰囲気を表す、絵にしやすい具体的な言葉を選ぶこと（例: コーヒーカップ、朝日、ノートPC、あたたかい配色）
-- 抽象的すぎる言葉（例:「絆」「成長」）は避けること
+## ワードの条件
+- 8文字以内目安（日本語可）
+- そのオフ会を一目で最も表す言葉であること
+- 文章ではなく単語・短いフレーズにすること
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。
 
 \`\`\`json
-{ "keywords": ["...", "...", "...", "...", "...", "..."], "styleNote": "主催者向けの補足（生成のコツ、40文字以内）" }
+{ "word": "...", "styleNote": "主催者向けの補足（生成のコツ、40文字以内）" }
 \`\`\``;
 
   const text = await callGemini(apiKey, prompt);
   const parsed = extractJSON(text);
-  const keywords: string[] = Array.isArray(parsed?.keywords)
-    ? parsed.keywords.map(String).filter(Boolean).slice(0, ICON_KEYWORD_COUNT)
-    : [];
-  if (keywords.length === 0) {
-    throw new Error('アイコン用キーワードの生成結果を読み取れませんでした。再度お試しください。');
+  const word = String(parsed?.word || '').trim();
+  if (!word) {
+    throw new Error('アイコン用ワードの生成結果を読み取れませんでした。再度お試しください。');
   }
   return {
-    keywords,
-    prompt: buildIconPrompt(keywords),
+    word,
+    prompt: buildIconPrompt(word),
     styleNote: String(parsed?.styleNote || ''),
   };
 }
@@ -716,7 +704,7 @@ export async function generateThumbnailAssets(
 ## imagePromptの必須条件（プロンプト文に必ず含めること）
 - プロンプトは必ず「あなたはプロのデザイナーです。」という一文で書き始めること
 - 横長（16:9）の告知バナー構図
-- 会の内容が伝わるイメージイラスト（人物が楽しそうに集まる様子など）
+- 会の内容が伝わる構図（画風は指定しない。人物が楽しそうに集まる様子など、内容が伝わるモチーフを指示する）
 - あなたが考えたキャッチーなタイトル（20文字以内）を、画像内で最も大きく目立つように配置すること
 - 日時「${dateTimeText}」と場所「${placeText}」を、タイトルより小さく読みやすいサイズで画像内に配置すること
 - 文字は背景との十分なコントラストを確保し、はっきり読めるようにすること
