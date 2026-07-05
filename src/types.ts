@@ -11,6 +11,8 @@ export enum AppStep {
 }
 
 export interface OrganizerProfile {
+  /** お名前（ニックネーム）。任意だが推奨入力 */
+  organizerName: string;
   selfIntro: string;
   interests: string;
   /** どこで開催したいか: 対面 or オンライン（必須選択） */
@@ -115,6 +117,10 @@ export interface EventSnapshot {
   imagesSourceKey: string;
   announcementSourceKey: string;
   shareSourceKey: string;
+  /** 詳細（公開情報）の「書き直してほしい点」の蓄積履歴（オフ会ごと） */
+  announcementFeedbackHistory: string[];
+  /** 進行イメージの「作り直してほしい点」の蓄積履歴（オフ会ごと） */
+  scheduleFeedbackHistory: string[];
 }
 
 export interface SavedEvent {

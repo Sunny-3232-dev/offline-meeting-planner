@@ -44,28 +44,22 @@ export function ConfirmDialogHost() {
       onClick={() => handleAnswer(false)}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-        style={{ border: '1px solid #e7e5e4' }}
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <p
-          className="text-sm leading-relaxed whitespace-pre-wrap"
-          style={{ color: '#1b1c1c' }}
-        >
+        <p className="text-sm leading-relaxed whitespace-pre-wrap text-slate-800">
           {message}
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={() => handleAnswer(false)}
-            className="px-4 py-2 text-sm font-medium rounded-full bg-stone-100 hover:bg-stone-200 transition-colors"
-            style={{ color: '#564337' }}
+            className="px-4 py-2 text-sm font-medium rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
           >
             キャンセル
           </button>
           <button
             onClick={() => handleAnswer(true)}
-            className="px-5 py-2 text-sm font-medium rounded-full transition-colors"
-            style={{ background: '#e67e22', color: '#502600' }}
+            className="px-5 py-2 text-sm font-medium rounded-full bg-sky-600 text-white hover:bg-sky-700 transition-colors"
           >
             OK
           </button>

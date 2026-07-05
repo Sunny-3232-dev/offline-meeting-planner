@@ -151,6 +151,16 @@ function conceptLines(concept: IdeaConcept): string {
   ].join('\n');
 }
 
+/** 主催者名（自己紹介・つぶやき等）をプロンプトに渡す際の共通指示文。
+ * 主催者は本人なので、自分の名前に「さん」を付けない（一人称）。
+ * 参加者・他者には従来通り敬称OK。 */
+function organizerNameDirective(organizerName: string): string {
+  if (!organizerName || !organizerName.trim()) {
+    return '- 主催者名: 未記入（名前は無理に入れず、自然な一人称の自己紹介にすること）';
+  }
+  return `- 主催者名: ${organizerName}（主催者本人です。自己紹介・呼びかけでは一人称として名前を使い、「${organizerName}です」のように書くこと。自分の名前に「さん」など敬称は絶対に付けないこと。参加者や他の人を指す場合は従来通り敬称を使ってよい）`;
+}
+
 /** オンラインツール選択に応じた開催場所ラベル（詳細文・スケジュール等の表示に使う） */
 export function venueLabelOf(basics: EventBasics): string {
   if (basics.venueType !== 'online') return basics.venueDetail;
@@ -289,6 +299,7 @@ ${venuePreferenceDirective(profile)}
 
 ## 注意事項
 - 主催者が決めたテーマ「${profile.plannedTheme}」に必ず沿うこと（テーマを外れた提案はしない）
+- 主催者が入力したテーマ「${profile.plannedTheme}」を勝手に別テーマへ拡大解釈せず、その内容に忠実に具体化すること。テーマ名の言い換え・置き換えは最小限にすること
 - ${THEME_IDEAS_COUNT}件は切り口・時間帯・進め方にバリエーションを持たせること
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
 
@@ -461,14 +472,8 @@ export async function generateSchedule(
   apiKey: string,
   basics: EventBasics,
   concept: IdeaConcept,
-  idea: PlanIdea,
-  feedback?: string
+  idea: PlanIdea
 ): Promise<Omit<ScheduleItem, 'id'>[]> {
-  const feedbackSection =
-    feedback && feedback.trim()
-      ? `\n## 作り直しの要望（最優先で反映）\n${feedback.trim()}\n`
-      : '';
-
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 初めてオフ会を主催する人のために、当日の進行イメージ（タイムスケジュール）を作ってください。
 
@@ -480,7 +485,7 @@ export async function generateSchedule(
 - 開催時間: ${basics.durationMinutes}分
 - 定員: ${basics.capacity}人（主催者含む）
 ${conceptLines(concept)}
-${feedbackSection}
+
 ## 進行イメージの条件
 - 各項目は {title, description, durationMinutes} で構成
 - **durationMinutesの合計が必ず${basics.durationMinutes}分ちょうどになること**
@@ -489,6 +494,82 @@ ${feedbackSection}
 - descriptionには主催者向けの進行のコツを書くこと（50文字以内。例: 「主催者から先に話すと場が和みます」）
 - 項目数は5〜8個程度
 - 初主催者が迷わない、シンプルで無理のない進行にすること
+
+## 出力形式（JSON）
+必ず有効なJSONのみを出力してください。
+
+\`\`\`json
+[
+  { "title": "オープニング", "description": "...", "durationMinutes": 10 }
+]
+\`\`\``;
+
+  const text = await callGemini(apiKey, prompt);
+  const parsed = extractJSON(text);
+  const list: any[] = Array.isArray(parsed) ? parsed : parsed?.schedule || [];
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error('進行イメージの生成結果を読み取れませんでした。再度お試しください。');
+  }
+  return list
+    .filter((i) => i && i.title)
+    .map((i) => ({
+      title: String(i.title),
+      description: String(i.description || ''),
+      durationMinutes: Math.max(1, Number(i.durationMinutes) || 10),
+    }));
+}
+
+/** 進行イメージ（schedule）の項目文字列化（reviseSchedule用） */
+function scheduleLinesForRevise(basics: EventBasics, schedule: ScheduleItem[]): string {
+  if (schedule.length === 0) return '（項目なし）';
+  return schedule
+    .map((s, i) => `${i + 1}. ${s.title}（${s.durationMinutes}分）${s.description ? ` - ${s.description}` : ''}`)
+    .join('\n');
+}
+
+/**
+ * 進行イメージの作り直し（「AIに作り直してほしい点」指定時）。
+ * ゼロから作り直すのではなく、現在の schedule（ユーザーが削除・並べ替えた構成）をベースに、
+ * 蓄積された feedbackHistory を反映して調整する。
+ */
+export async function reviseSchedule(
+  apiKey: string,
+  basics: EventBasics,
+  concept: IdeaConcept,
+  idea: PlanIdea,
+  currentSchedule: ScheduleItem[],
+  feedbackHistory: string[]
+): Promise<Omit<ScheduleItem, 'id'>[]> {
+  const historyText =
+    feedbackHistory.length > 0
+      ? feedbackHistory.map((f, i) => `${i + 1}. ${f}`).join('\n')
+      : '（なし）';
+
+  const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
+以下は主催者がすでに編集済みの「現在の進行イメージ（タイムスケジュール）」です。
+ゼロから作り直すのではなく、この現在の構成をベースに、主催者からの要望を反映して調整してください。
+
+## オフ会の情報
+- タイトル: ${basics.title}
+- 企画: ${idea.title}（${idea.summary}）
+- 開催形態: ${basics.venueType === 'online' ? 'オンライン' : 'オフライン（対面）'}
+- 場所: ${venueLabelOf(basics)}
+- 開催時間: ${basics.durationMinutes}分
+- 定員: ${basics.capacity}人（主催者含む）
+${conceptLines(concept)}
+
+## 現在の進行イメージ（この構成・順序をベースにすること）
+${scheduleLinesForRevise(basics, currentSchedule)}
+
+## 主催者からの要望（これまでに伝えた分をすべて含む。すべて反映すること）
+${historyText}
+
+## 調整方針（重要）
+- 主催者が既に削除した項目を勝手に復活させないこと。主催者が並べ替えた順序はできるだけ尊重すること
+- ゼロから新しい進行を作るのではなく、現在の構成に要望を反映する形で調整すること（項目の追加・修正・時間配分の見直しは要望に応じて行ってよい）
+- **durationMinutesの合計が必ず${basics.durationMinutes}分ちょうどになること**
+- 各項目は {title, description, durationMinutes} で構成
+- descriptionには主催者向けの進行のコツを書くこと（50文字以内）
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。
@@ -532,14 +613,8 @@ export async function generateAnnouncement(
   concept: IdeaConcept,
   basics: EventBasics,
   schedule: ScheduleItem[],
-  formattedDate: string,
-  feedback?: string
+  formattedDate: string
 ): Promise<AnnouncementResult> {
-  const feedbackSection =
-    feedback && feedback.trim()
-      ? `\n## 書き直しの要望（必ず反映すること・最優先で従うこと）\n${feedback.trim()}\n`
-      : '';
-
   const venueLabel = venueLabelOf(basics);
 
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
@@ -555,7 +630,8 @@ ${conceptLines(concept)}
 
 ## 主催者について
 ${profile.selfIntro}
-${feedbackSection}
+${organizerNameDirective(profile.organizerName)}
+
 ## 告知文（body）の構成（必ずこのテンプレート構成で出力すること）
 以下の見出し（■・▶）と改行構成を必ずそのまま使い、各セクションの中身だけを埋めてください。
 「■当日の流れ」セクションは含めないでください（別途システム側で自動挿入します）。
@@ -574,7 +650,10 @@ ${feedbackSection}
 （開催日「${formattedDate}」から逆算した妥当な募集期限を提案する。例: ◯月◯日（◯）まで）
 
 ■注意事項
-（キャンセル連絡・遅刻連絡など、初主催でも書きやすい定番の注意事項を1〜3行）
+（${basics.venueType === 'online'
+    ? 'オンライン開催なので、「無断キャンセル厳禁」等の強い表現は使わないこと。「参加が難しくなったら早めにひとことお知らせください」程度のやわらかい表現にすること'
+    : '対面開催なので、会場予約や人数の都合があるため、無断キャンセルは控えてほしい旨を含める（キャンセル連絡・遅刻連絡など、初主催でも書きやすい定番の注意事項を1〜3行）'
+  }）
 
 ▶ オフ会ガイドラインはこちら
 https://site.libecity.com/meetup-guidelines
@@ -590,10 +669,11 @@ https://site.libecity.com/meetup-guidelines
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください。
 
 ## タグ（tags）
-リベシティのオフ会チャット作成フォームに入力する、この会に合ったタグを5個前後考えてください。
+リベシティのオフ会チャット作成フォームに入力する、この会に合ったタグを3〜5個考えてください。
 - 例: オフ会 / 交流 / 初心者大歓迎 / 朝活 / もくもく会
 - 「#」記号は付けないこと
 - この会の内容・雰囲気に合った具体的なタグにすること
+- 必ず3個以上5個以内に収めること
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。bodyに告知文全体、tagsにタグの配列を入れること。
@@ -609,9 +689,78 @@ https://site.libecity.com/meetup-guidelines
     throw new Error('告知文の生成結果を読み取れませんでした。再度お試しください。');
   }
   const tags: string[] = Array.isArray(parsed?.tags)
-    ? parsed.tags.map(String).filter(Boolean).slice(0, 8)
+    ? parsed.tags.map(String).filter(Boolean).slice(0, 5)
     : [];
   // 「■当日の流れ」はAIに書かせず、コード側で機械挿入する
+  const bodyWithTimetable = syncTimetableSection(ensureGuidelineFooter(body), basics, schedule);
+  return {
+    body: bodyWithTimetable,
+    tags,
+  };
+}
+
+/**
+ * 詳細（公開情報）の書き直し（「AIに書き直してほしい点」指定時）。
+ * ゼロから再生成するのではなく、現在表示中の詳細文全文をベースに、
+ * 蓄積された feedbackHistory（過去分＋今回分すべて）を反映した改訂版を返す。
+ * テンプレ構成（■見出し）・固定文・マークダウン禁止は維持し、
+ * 「■当日の流れ」はAIに触らせず、呼び出し側で syncTimetableSection により機械同期し直すこと。
+ */
+export async function reviseAnnouncement(
+  apiKey: string,
+  profile: OrganizerProfile,
+  currentAnnouncement: string,
+  feedbackHistory: string[],
+  basics: EventBasics,
+  schedule: ScheduleItem[]
+): Promise<AnnouncementResult> {
+  const historyText =
+    feedbackHistory.length > 0
+      ? feedbackHistory.map((f, i) => `${i + 1}. ${f}`).join('\n')
+      : '（なし）';
+
+  const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
+以下は、リベシティのオフ会チャット作成フォームの「詳細（公開情報）」欄に掲載する、現在の告知文です。
+ゼロから書き直すのではなく、この現在の文章全文をベースに、主催者からの要望（これまでに伝えた分をすべて含む）を反映した改訂版を作ってください。
+
+## 現在の詳細文（このテキストをベースに改訂すること）
+${currentAnnouncement}
+
+## 主催者からの書き直し要望（これまでに伝えた分をすべて含む。すべて反映すること）
+${historyText}
+
+## オフ会の情報（参考。矛盾があれば現在の詳細文より優先しない）
+- タイトル: ${basics.title}
+- 開催形態: ${basics.venueType === 'online' ? 'オンライン' : 'オフライン（対面）'}
+${organizerNameDirective(profile.organizerName)}
+
+## 改訂方針（重要）
+- 現在の詳細文の内容・情報（日時・場所・定員など具体的な事実）を勝手に変えないこと。要望に関係ない部分はできるだけ元の文章を活かすこと
+- テンプレート構成（■イベント・オフ会内容 / ■参加費用 / ■参加方法 / ■募集期限 / ■注意事項 / ▶ オフ会ガイドラインはこちら）は必ずそのまま維持すること。見出しを増減・変更しないこと
+- 「■当日の流れ」セクションがある場合はそのまま残すか触れないこと（別途システム側で機械的に同期し直します）
+- 「■参加方法」の本文2行目（「参加希望の方は、こちらのチャットに参加申請をお願いします。」）と、末尾の「▶ オフ会ガイドラインはこちら」「https://site.libecity.com/meetup-guidelines」の2行は、一字一句そのまま維持すること（絶対に変えない）
+- リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください
+
+## タグ（tags）
+現在のタグ内容も踏まえつつ、この会に合ったタグを3〜5個考えてください（要望に関係なければ内容を維持してよい）。「#」記号は付けないこと。
+
+## 出力形式（JSON）
+必ず有効なJSONのみを出力してください。bodyに告知文全体、tagsにタグの配列を入れること。
+
+\`\`\`json
+{ "body": "...", "tags": ["...", "...", "...", "...", "..."] }
+\`\`\``;
+
+  const text = await callGemini(apiKey, prompt);
+  const parsed = extractJSON(text);
+  const body = String(parsed?.body || '');
+  if (!body) {
+    throw new Error('詳細（公開情報）の書き直し結果を読み取れませんでした。再度お試しください。');
+  }
+  const tags: string[] = Array.isArray(parsed?.tags)
+    ? parsed.tags.map(String).filter(Boolean).slice(0, 5)
+    : [];
+  // 「■当日の流れ」はAIに任せず、コード側で機械同期し直す
   const bodyWithTimetable = syncTimetableSection(ensureGuidelineFooter(body), basics, schedule);
   return {
     body: bodyWithTimetable,
@@ -648,9 +797,11 @@ export async function generateIconPrompt(
 - 雰囲気: ${concept.cherish.join('、')}
 
 ## ワードの条件
-- 8文字以内目安（日本語可）
-- そのオフ会を一目で最も表す言葉であること
-- 文章ではなく単語・短いフレーズにすること
+- そのオフ会を最も的確に表す“名詞”のキーワードを1語だけ選ぶこと
+- 動詞・活用形（例:「形に」「集まろう」）、文の断片、助詞付き表現は絶対に禁止。必ず名詞（体言）で終えること
+- 短く（1〜6文字目安）、パッと見て何の会か伝わる語にすること
+- 良い例（名詞）: 朝活／もくもく／ボドゲ／副業／読書／交流／雑談／飲み会
+- 悪い例（動詞・断片。禁止）: 形に／語ろう／集まる／のために
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。
@@ -736,7 +887,8 @@ export async function generateShareTexts(
   announcement: string,
   basics: EventBasics,
   region: string,
-  formattedDate: string
+  formattedDate: string,
+  organizerName?: string
 ): Promise<ShareTexts> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 以下のオフ会告知文をもとに、2つの場所に投稿する文章を作ってください。
@@ -748,6 +900,7 @@ ${announcement}
 - タイトル: ${basics.title}
 - 日時: ${formattedDate} ${basics.startTime}〜
 - 主催者の地域: ${region || '未記入'}
+${organizerNameDirective(organizerName || '')}
 
 ## 作る文章
 1. regionalChat: 地域支部チャット（例: 関東チャット）向け
@@ -756,9 +909,12 @@ ${announcement}
    - 日時・場所・定員を含める
    - 最後に「詳細・お申し込みはイベント案内をご覧ください」で締める
 2. tweet: リベシティの「つぶやき」向け
-   - カジュアル・**90文字以内**（本文の後ろにオフ会チャットのURLを付けて合計140文字に収めるため、必ず短くすること）
+   - カジュアル・文字数制限は撤廃。オフ会の魅力・日時・場所・参加方法などを詳しく書いてよい（ただし冗長になりすぎない範囲で）
    - 絵文字を使って気軽な雰囲気に
    - 初主催であることを添えて応援したくなる文面に
+
+## 注意
+- 主催者本人の名前には「さん」など敬称を付けないこと（一人称）。参加者や他の人には従来通り敬称OK
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。

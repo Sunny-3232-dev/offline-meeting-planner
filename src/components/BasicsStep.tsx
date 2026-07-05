@@ -271,7 +271,7 @@ export default function BasicsStep({
           <span className="block text-sm font-semibold text-slate-700 mb-1.5">
             定員（主催者含む） <span className="text-red-500 text-xs">必須</span>
           </span>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-wrap items-center gap-3 mb-2">
             <div className="flex items-center rounded-xl border border-slate-300 bg-white overflow-hidden">
               <button
                 type="button"
@@ -292,6 +292,22 @@ export default function BasicsStep({
               >
                 ＋
               </button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={2}
+                max={50}
+                value={basics.capacity}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isNaN(v)) return;
+                  set({ capacity: Math.min(50, Math.max(2, v)) });
+                }}
+                aria-label="定員を数値で入力"
+                className="w-20 px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white tabular-nums"
+              />
+              <span className="text-xs text-slate-500">人（直接入力）</span>
             </div>
             <button
               type="button"

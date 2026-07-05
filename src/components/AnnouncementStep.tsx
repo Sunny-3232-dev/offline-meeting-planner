@@ -6,6 +6,8 @@ interface AnnouncementStepProps {
   onChange: (text: string) => void;
   /** feedbackが空文字の場合は初回生成（同条件での再生成）、それ以外は要望を反映して書き直す */
   onRegenerate: (feedback: string) => void;
+  /** これまでに蓄積された「書き直してほしい点」の履歴（オフ会ごと） */
+  feedbackHistory?: string[];
   onNext: () => void;
   onBack: () => void;
 }
@@ -14,6 +16,7 @@ export default function AnnouncementStep({
   announcement,
   onChange,
   onRegenerate,
+  feedbackHistory = [],
   onNext,
   onBack,
 }: AnnouncementStepProps) {
@@ -49,6 +52,11 @@ export default function AnnouncementStep({
             <label htmlFor="announcementFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
               AIに書き直してほしい点を教えてください
             </label>
+            {feedbackHistory.length > 0 && (
+              <p className="text-[11px] text-slate-400 mb-2">
+                これまでに伝えた指示（{feedbackHistory.length}件）を踏まえて書き直します: {feedbackHistory.join(' / ')}
+              </p>
+            )}
             <div className="flex flex-wrap gap-1.5 mb-3" aria-label="おすすめの指示">
               {[
                 'もっとカジュアルに',

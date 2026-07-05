@@ -39,16 +39,18 @@ function CopyField({
   label,
   value,
   longText = false,
+  hideCopyButton = false,
 }: {
   label: string;
   value: string;
   longText?: boolean;
+  hideCopyButton?: boolean;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-4">
       <div className="flex items-center justify-between gap-2 mb-2">
         <h3 className="text-sm font-bold text-slate-700">{label}</h3>
-        <CopyButton text={value} />
+        {!hideCopyButton && <CopyButton text={value} />}
       </div>
       <p
         className={`text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 whitespace-pre-wrap break-words ${
@@ -61,6 +63,50 @@ function CopyField({
   );
 }
 
+/** タグを1つずつクリックでコピーできるチップ */
+function TagChip({ tag }: { tag: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(tag);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // noop
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+        copied ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+      }`}
+    >
+      {copied ? <CheckIcon size={12} /> : <CopyIcon size={12} />}
+      {copied ? 'コピーしました' : tag}
+    </button>
+  );
+}
+
+function TagsField({ tags }: { tags: string[] }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-sm font-bold text-slate-700">タグ</h3>
+        <span className="text-[11px] text-slate-400">クリックで1つずつコピー</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((tag, i) => (
+          <React.Fragment key={`${tag}-${i}`}>
+            <TagChip tag={tag} />
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatSetupStep({
   basics,
   announcement,
@@ -68,8 +114,8 @@ export default function ChatSetupStep({
   onNext,
   onBack,
 }: ChatSetupStepProps) {
-  const tagsText = eventTags.join(' ');
   const isOfficialOffice = !!basics.officeKey;
+  const isOnline = basics.venueType === 'online';
 
   return (
     <div className="max-w-2xl mx-auto py-8 animate-fade-in">
@@ -99,14 +145,16 @@ export default function ChatSetupStep({
 
       <div className="space-y-3 mb-8">
         <CopyField label="オフ会チャットルーム名" value={basics.title} />
-        <CopyField label="定員" value={`${basics.capacity}`} />
-        <CopyField label="タグ" value={tagsText} />
+        <CopyField label="定員" value={`${basics.capacity}`} hideCopyButton />
+        <TagsField tags={eventTags} />
         <CopyField label="詳細（公開）情報" value={announcement} longText />
 
         {/* チャット参加者への限定公開情報 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <h3 className="text-sm font-bold text-slate-700 mb-2">チャット参加者への限定公開情報</h3>
-          {isOfficialOffice ? (
+          {isOnline ? (
+            <p className="text-xs text-slate-400">オンライン開催のため特にありません</p>
+          ) : isOfficialOffice ? (
             <p className="text-xs text-slate-400">
               公式オフィス開催のため、限定公開情報は特にありません（必要なら当日の集合場所メモなどを）
             </p>

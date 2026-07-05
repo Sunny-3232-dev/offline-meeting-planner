@@ -22,6 +22,21 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
 
       <div className="space-y-6">
         <div>
+          <label htmlFor="organizerName" className="block text-sm font-semibold text-slate-700 mb-1.5">
+            お名前（ニックネーム） <span className="text-slate-400 text-xs">任意</span>
+          </label>
+          <input
+            id="organizerName"
+            type="text"
+            value={profile.organizerName}
+            onChange={(e) => set({ organizerName: e.target.value })}
+            placeholder="例: さにー、たろう"
+            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+          />
+          <p className="mt-1 text-xs text-slate-400">告知文・つぶやきの自己紹介で主催者名として使われます</p>
+        </div>
+
+        <div>
           <label htmlFor="selfIntro" className="block text-sm font-semibold text-slate-700 mb-1.5">
             自己紹介 <span className="text-red-500 text-xs">必須</span>
           </label>

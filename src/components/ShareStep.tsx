@@ -3,9 +3,6 @@ import { ShareTexts, EventBasics } from '../types';
 import { BRANCH_CHATS, branchChatUrl, guessBranch } from '../constants';
 import { ChevronLeftIcon, RefreshIcon, CopyIcon, CheckIcon, SendIcon, KanpaiIcon } from './icons';
 
-// ノウハウ図書館つぶやきの文字数上限（既存ツールと同じ）
-const TWEET_LIMIT = 140;
-
 /** つぶやき本文 + オフ会チャットURL（任意）を結合して最終テキストを得る */
 function buildTweetText(body: string, chatUrl: string): string {
   const url = chatUrl.trim();
@@ -86,7 +83,6 @@ export default function ShareStep({
   onFinish,
 }: ShareStepProps) {
   const tweetFinal = shareTexts ? buildTweetText(shareTexts.tweet, offkaiChatUrl) : '';
-  const tweetOver = tweetFinal.length > TWEET_LIMIT;
 
   // 支部チャット: プロフィールの地域から自動推定し、手動でも選べる
   const guessed = useMemo(() => guessBranch(region), [region]);
@@ -181,8 +177,8 @@ export default function ShareStep({
             <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap">
               {tweetFinal}
             </p>
-            <p className={`mt-2 text-xs ${tweetOver ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
-              {tweetFinal.length} / {TWEET_LIMIT}文字{tweetOver ? '（上限を超えています。本文を短く編集してから投稿してください）' : ''}
+            <p className="mt-2 text-xs text-slate-400">
+              {tweetFinal.length}文字
             </p>
           </div>
 

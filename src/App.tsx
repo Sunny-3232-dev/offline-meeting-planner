@@ -34,7 +34,9 @@ import {
   generateTitleCandidates,
   suggestCapacity,
   generateSchedule,
+  reviseSchedule,
   generateAnnouncement,
+  reviseAnnouncement,
   generateIconPrompt,
   generateThumbnailAssets,
   generateShareTexts,
@@ -49,6 +51,7 @@ import { EntakuLogo } from './components/Entaku';
 import { confirmDialog, ConfirmDialogHost } from './utils/confirmDialog';
 
 const INITIAL_PROFILE: OrganizerProfile = {
+  organizerName: '',
   selfIntro: '',
   interests: '',
   venuePreference: 'offline',
@@ -232,6 +235,13 @@ function AppContent() {
   const [shareSourceKey, setShareSourceKey] = useState<string>(
     () => loadFromStorage<string>('shareSourceKey') || ''
   );
+  // 「AIに書き直してほしい点」の蓄積履歴（オフ会ごと）
+  const [announcementFeedbackHistory, setAnnouncementFeedbackHistory] = useState<string[]>(
+    () => loadFromStorage<string[]>('announcementFeedbackHistory') || []
+  );
+  const [scheduleFeedbackHistory, setScheduleFeedbackHistory] = useState<string[]>(
+    () => loadFromStorage<string[]>('scheduleFeedbackHistory') || []
+  );
 
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
@@ -309,6 +319,8 @@ function AppContent() {
   useEffect(() => { saveToStorage('imagesSourceKey', imagesSourceKey); }, [imagesSourceKey]);
   useEffect(() => { saveToStorage('announcementSourceKey', announcementSourceKey); }, [announcementSourceKey]);
   useEffect(() => { saveToStorage('shareSourceKey', shareSourceKey); }, [shareSourceKey]);
+  useEffect(() => { saveToStorage('announcementFeedbackHistory', announcementFeedbackHistory); }, [announcementFeedbackHistory]);
+  useEffect(() => { saveToStorage('scheduleFeedbackHistory', scheduleFeedbackHistory); }, [scheduleFeedbackHistory]);
 
   // 編集中のオフ会スナップショットを保存済みイベントに同期
   useEffect(() => {
@@ -329,11 +341,13 @@ function AppContent() {
       imagesSourceKey,
       announcementSourceKey,
       shareSourceKey,
+      announcementFeedbackHistory,
+      scheduleFeedbackHistory,
     };
     setEvents((prev) =>
       prev.map((ev) => (ev.id === activeEventId ? { ...ev, updatedAt: Date.now(), snapshot } : ev))
     );
-  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey]);
+  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory]);
 
   const goToStep = useCallback((next: AppStep) => {
     setStep(next);
@@ -378,6 +392,8 @@ function AppContent() {
     setImagesSourceKey('');
     setAnnouncementSourceKey('');
     setShareSourceKey('');
+    setAnnouncementFeedbackHistory([]);
+    setScheduleFeedbackHistory([]);
   }, []);
 
   const handleReset = useCallback(async () => {
@@ -430,6 +446,8 @@ function AppContent() {
     setImagesSourceKey(s.imagesSourceKey || '');
     setAnnouncementSourceKey(s.announcementSourceKey || '');
     setShareSourceKey(s.shareSourceKey || '');
+    setAnnouncementFeedbackHistory(s.announcementFeedbackHistory || []);
+    setScheduleFeedbackHistory(s.scheduleFeedbackHistory || []);
     setStep(s.maxReached || AppStep.BASICS);
   }, [events]);
 
@@ -466,10 +484,10 @@ function AppContent() {
     setError(null);
     try {
       const titles = await generateTitleCandidates(apiKey, useConcept, useIdea);
+      // タイトル候補はあくまで代替候補。title（企画案で選んだタイトル）は自動で上書きしない
       setBasics((prev) => ({
         ...prev,
         titleCandidates: titles,
-        title: prev.title || titles[0] || prev.title,
       }));
     } catch (e: any) {
       setError(e?.message || 'タイトル候補の生成に失敗しました。');
@@ -498,7 +516,8 @@ function AppContent() {
 
   const runGenerateSchedule = useCallback(async (opts?: { confirm?: boolean; feedback?: string }) => {
     if (!ensureApiKey() || !concept || !activeIdea) return;
-    if (opts?.confirm && schedule.length > 0) {
+    const hasFeedback = !!opts?.feedback && opts.feedback.trim().length > 0;
+    if (opts?.confirm && schedule.length > 0 && !hasFeedback) {
       const ok = await confirmDialog('進行イメージをAIで作り直すと、いまの編集内容は上書きされます。よろしいですか？');
       if (!ok) return;
     }
@@ -507,19 +526,30 @@ function AppContent() {
     setLoadingSourceText(`${basics.title} ${basics.durationMinutes}分 ${basics.capacity}人`);
     setError(null);
     try {
-      const items = await generateSchedule(apiKey, basics, concept, activeIdea, opts?.feedback);
-      setSchedule(items.map((i) => ({ ...i, id: crypto.randomUUID() })));
+      if (hasFeedback) {
+        // 「作り直してほしい点」指定時は、現在のscheduleをベースに、蓄積した指示履歴を反映して調整する
+        // （ゼロから作り直さない。ユーザーの削除・並べ替えを尊重する）
+        const nextHistory = [...scheduleFeedbackHistory, opts!.feedback!.trim()];
+        const items = await reviseSchedule(apiKey, basics, concept, activeIdea, schedule, nextHistory);
+        setSchedule(items.map((i) => ({ ...i, id: crypto.randomUUID() })));
+        setScheduleFeedbackHistory(nextHistory);
+      } else {
+        // 基本情報変更起因の再生成等（feedback無し）はゼロから生成
+        const items = await generateSchedule(apiKey, basics, concept, activeIdea);
+        setSchedule(items.map((i) => ({ ...i, id: crypto.randomUUID() })));
+      }
       setScheduleSourceKey(basicsConceptFingerprint(basics, concept));
     } catch (e: any) {
       setError(e?.message || '進行イメージの生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, concept, activeIdea, basics, schedule.length, ensureApiKey]);
+  }, [apiKey, concept, activeIdea, basics, schedule, scheduleFeedbackHistory, ensureApiKey]);
 
   const runGenerateAnnouncement = useCallback(async (feedback: string) => {
     if (!ensureApiKey() || !concept || !activeIdea) return;
-    if (announcement) {
+    const hasFeedback = !!feedback && feedback.trim().length > 0;
+    if (announcement && !hasFeedback) {
       const ok = await confirmDialog('詳細（公開情報）をAIで書き直すと、いまの編集内容は上書きされます。よろしいですか？');
       if (!ok) return;
     }
@@ -528,24 +558,39 @@ function AppContent() {
     setLoadingSourceText(`${basics.title} ${concept.purpose} ${concept.persona}`);
     setError(null);
     try {
-      const result: AnnouncementResult = await generateAnnouncement(
-        apiKey,
-        profile,
-        concept,
-        basics,
-        schedule,
-        formatDateJa(basics.date),
-        feedback
-      );
-      setAnnouncement(result.body);
-      setEventTags(result.tags);
+      if (hasFeedback && announcement) {
+        // 「書き直してほしい点」指定時は、現在表示中の詳細文をベースに、蓄積した指示履歴を反映して改訂する
+        const nextHistory = [...announcementFeedbackHistory, feedback.trim()];
+        const result: AnnouncementResult = await reviseAnnouncement(
+          apiKey,
+          profile,
+          announcement,
+          nextHistory,
+          basics,
+          schedule
+        );
+        setAnnouncement(result.body);
+        setEventTags(result.tags);
+        setAnnouncementFeedbackHistory(nextHistory);
+      } else {
+        const result: AnnouncementResult = await generateAnnouncement(
+          apiKey,
+          profile,
+          concept,
+          basics,
+          schedule,
+          formatDateJa(basics.date)
+        );
+        setAnnouncement(result.body);
+        setEventTags(result.tags);
+      }
       setAnnouncementSourceKey(announcementSourceFingerprint(basics, concept));
     } catch (e: any) {
       setError(e?.message || '詳細（公開情報）の生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, profile, concept, activeIdea, basics, schedule, announcement, ensureApiKey]);
+  }, [apiKey, profile, concept, activeIdea, basics, schedule, announcement, announcementFeedbackHistory, ensureApiKey]);
 
   // 画像プロンプトは待ち時間を作らないため、グローバルオーバーレイを使わず
   // バックグラウンドで生成する（BASICS完了時に先行生成を開始）。
@@ -602,7 +647,14 @@ function AppContent() {
     const regionHint = computeRegionHint(basics);
     try {
       setShareTexts(
-        await generateShareTexts(apiKey, announcement, basics, regionHint, formatDateJa(basics.date))
+        await generateShareTexts(
+          apiKey,
+          announcement,
+          basics,
+          regionHint,
+          formatDateJa(basics.date),
+          profile.organizerName
+        )
       );
       setShareSourceKey(shareSourceFingerprint(basics, announcement, regionHint));
     } catch (e: any) {
@@ -610,7 +662,7 @@ function AppContent() {
     } finally {
       setLoading(false);
     }
-  }, [apiKey, announcement, basics, ensureApiKey]);
+  }, [apiKey, announcement, basics, profile, ensureApiKey]);
 
   const runGenerateIdeas = useCallback(async () => {
     if (!ensureApiKey()) return;
@@ -702,6 +754,9 @@ function AppContent() {
               setSelectedIdeaId(idea.id);
               setActiveIdea(idea);
               setConcept(derivedConcept);
+              // 基本情報のタイトルは、企画案で選んだタイトルをそのまま初期値にする
+              // （タイトル候補生成でtitleを上書きしないため、ここで確定させる）
+              setBasics((prev) => ({ ...prev, title: idea.title }));
               if (isIdeaChange) {
                 // 企画が変わったので下流の生成物をすべて空にし、作り直しの土台を作る
                 setBasics((prev) => ({ ...prev, titleCandidates: [], capacitySuggestion: null }));
@@ -715,6 +770,8 @@ function AppContent() {
                 setImagesSourceKey('');
                 setAnnouncementSourceKey('');
                 setShareSourceKey('');
+                setAnnouncementFeedbackHistory([]);
+                setScheduleFeedbackHistory([]);
               }
               if (!activeEventId) {
                 // 新規オフ会の開始時のみ、プロフィールの開催希望をbasics.venueTypeへ反映する
@@ -743,6 +800,8 @@ function AppContent() {
                       imagesSourceKey: '',
                       announcementSourceKey: '',
                       shareSourceKey: '',
+                      announcementFeedbackHistory: [],
+                      scheduleFeedbackHistory: [],
                     },
                   },
                 ]);
@@ -803,6 +862,7 @@ function AppContent() {
             basics={basics}
             onChange={setSchedule}
             onRegenerate={(feedback) => runGenerateSchedule({ confirm: true, feedback })}
+            feedbackHistory={scheduleFeedbackHistory}
             onNext={async () => {
               if (!announcement) {
                 // 詳細（公開情報）が未生成 → 従来通りAIで生成（schedule込み、■当日の流れ挿入済み）
@@ -844,6 +904,7 @@ function AppContent() {
             announcement={announcement}
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
+            feedbackHistory={announcementFeedbackHistory}
             onNext={() => {
               goToStep(AppStep.IMAGE_PROMPTS);
               // 先行生成が失敗していた場合のフォールバック（バックグラウンドで再試行）

@@ -9,6 +9,8 @@ interface ScheduleStepProps {
   onChange: (schedule: ScheduleItem[]) => void;
   /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
   onRegenerate: (feedback: string) => void;
+  /** これまでに蓄積された「作り直してほしい点」の履歴（オフ会ごと） */
+  feedbackHistory?: string[];
   onNext: () => void;
   onBack: () => void;
 }
@@ -22,6 +24,7 @@ export default function ScheduleStep({
   basics,
   onChange,
   onRegenerate,
+  feedbackHistory = [],
   onNext,
   onBack,
 }: ScheduleStepProps) {
@@ -187,6 +190,11 @@ export default function ScheduleStep({
           <label htmlFor="scheduleFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
             AIに作り直してほしい点を教えてください
           </label>
+          {feedbackHistory.length > 0 && (
+            <p className="text-[11px] text-slate-400 mb-2">
+              これまでに伝えた指示（{feedbackHistory.length}件）を踏まえて調整します: {feedbackHistory.join(' / ')}
+            </p>
+          )}
           <textarea
             id="scheduleFeedback"
             value={feedback}
