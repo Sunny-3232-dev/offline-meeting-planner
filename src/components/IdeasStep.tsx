@@ -1,7 +1,7 @@
 import React from 'react';
-import { PlanIdea, IdeaCategory } from '../types';
+import { PlanIdea, IdeaCategory, normalizeIdeaCategory } from '../types';
 import { MAX_PINNED_IDEAS } from '../constants';
-import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, LanternIcon, UserIcon, MapPinIcon, SproutIcon, GroupIcon, DiamondIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, LanternIcon, UserIcon, MapPinIcon, SproutIcon, GroupIcon, BookOpenIcon, PenToolIcon, KeyIcon, KanpaiIcon } from './icons';
 
 interface IdeasStepProps {
   ideas: PlanIdea[];
@@ -18,25 +18,57 @@ interface IdeasStepProps {
 }
 
 const CATEGORY_META: Record<IdeaCategory, { label: string; Icon: React.ComponentType<{ className?: string; size?: number }>; desc: string; bg: string; border: string; accent: string }> = {
-  classic: {
-    label: '王道系',
-    Icon: GroupIcon,
-    desc: 'リベシティ定番。雑談会・勉強会・もくもく会など集まりやすい会',
+  save: {
+    label: '貯める',
+    Icon: BookOpenIcon,
+    desc: '家計管理・固定費・ライフプランでお金を貯める会',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-200',
+    accent: 'text-emerald-700',
+  },
+  earn: {
+    label: '稼ぐ',
+    Icon: PenToolIcon,
+    desc: '副業・IT・スキルで収入を増やす会',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200',
+    accent: 'text-amber-700',
+  },
+  protect: {
+    label: '守る',
+    Icon: KeyIcon,
+    desc: '保険・税金・詐欺回避でお金を守る会',
     bg: 'bg-sky-50',
     border: 'border-sky-200',
     accent: 'text-sky-700',
   },
-  niche: {
-    label: 'テーマ系',
-    Icon: DiamondIcon,
-    desc: 'あなたの好き・得意を深掘りする会。刺さる人には強く刺さる',
-    bg: 'bg-purple-50',
-    border: 'border-purple-200',
-    accent: 'text-purple-700',
+  grow: {
+    label: '増やす',
+    Icon: SproutIcon,
+    desc: '新NISA・投資でお金を増やす会',
+    bg: 'bg-green-50',
+    border: 'border-green-200',
+    accent: 'text-green-700',
+  },
+  use: {
+    label: '使う',
+    Icon: KanpaiIcon,
+    desc: 'ランチ・BBQ・旅行などお金を使って楽しむ会',
+    bg: 'bg-rose-50',
+    border: 'border-rose-200',
+    accent: 'text-rose-700',
+  },
+  other: {
+    label: 'その他',
+    Icon: GroupIcon,
+    desc: '雑談・交流など気軽に集まる会',
+    bg: 'bg-slate-50',
+    border: 'border-slate-200',
+    accent: 'text-slate-600',
   },
 };
 
-const CATEGORY_ORDER: IdeaCategory[] = ['classic', 'niche'];
+const CATEGORY_ORDER: IdeaCategory[] = ['save', 'earn', 'protect', 'grow', 'use', 'other'];
 
 function IdeaCard({
   idea,
@@ -146,7 +178,7 @@ export default function IdeasStep({
       isSelected={selectedIdeaId === idea.id}
       isPinned={pinnedIds.includes(idea.id)}
       pinDisabled={pinLimitReached && !pinnedIds.includes(idea.id)}
-      meta={CATEGORY_META[idea.category]}
+      meta={CATEGORY_META[normalizeIdeaCategory(idea.category)]}
       onSelect={() => onSelect(idea.id)}
       onTogglePin={() => onTogglePin(idea.id)}
       onProceed={() => onProceed(idea)}
@@ -160,7 +192,7 @@ export default function IdeasStep({
       <p className="text-sm text-slate-500 mb-1">
         {plannedTheme && plannedTheme.trim()
           ? `テーマ「${plannedTheme}」に沿った企画案を提案しました。`
-          : 'あなたのプロフィールから、王道系・テーマ系を10案ずつ提案しました。'}
+          : 'あなたのプロフィールをもとに、お金の6テーマ（貯める・稼ぐ・守る・増やす・使う・その他）で企画案を提案しました。'}
       </p>
       <p className="text-xs text-slate-400 mb-6">
         気になった案は灯マークでピン留め（最大{MAX_PINNED_IDEAS}件・「別の案を出す」でも消えません）／ カードを<b>ダブルクリック</b>するとその企画に決めて次へ進みます
@@ -180,7 +212,7 @@ export default function IdeasStep({
 
       {CATEGORY_ORDER.map((cat) => {
         const meta = CATEGORY_META[cat];
-        const items = ideas.filter((i) => i.category === cat && !pinnedIds.includes(i.id));
+        const items = ideas.filter((i) => normalizeIdeaCategory(i.category) === cat && !pinnedIds.includes(i.id));
         if (items.length === 0) return null;
         return (
           <section key={cat} className="mb-8">

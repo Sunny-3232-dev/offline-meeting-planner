@@ -14,7 +14,7 @@ const PHASES: { keywords: string[]; flavorTexts: string[] }[] = [
     keywords: ['企画', 'アイデア'],
     flavorTexts: [
       'あなたに合うオフ会を考えています',
-      '王道系・テーマ系を出しています',
+      'お金の6テーマで企画を考えています',
       '初主催でもやりやすい形を選んでいます',
     ],
   },

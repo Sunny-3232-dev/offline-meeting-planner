@@ -170,25 +170,49 @@ export function venueLabelOf(basics: EventBasics): string {
 }
 
 // ============================================================
-// 1. generatePlanIdeas — 企画案（王道系/テーマ系 各10件・並列生成。テーマ指定時は5件のみ）
+// 1. generatePlanIdeas — 企画案（お金の6テーマ 各4件・並列生成。テーマ指定時は5件のみ）
 //    各案にペルソナ＋軽いMVV（目的・大切にしたいこと）を内包
 // ============================================================
 const IDEA_CATEGORIES: { id: IdeaCategory; label: string; direction: string }[] = [
   {
-    id: 'classic',
-    label: '王道系',
+    id: 'save',
+    label: '貯める',
     direction:
-      'リベシティで普段からよく開かれている定番のオフ会。参加者がイメージしやすく人が集まりやすい会（例: 雑談会、交流会、勉強会、もくもく作業会、ランチ会、飲み会、カフェ会、朝活、読書会、散歩会）',
+      '家計管理・固定費見直し・ライフプラン・節約でお金を貯める会（例: 家計簿もくもく会、固定費見直しシェア会、ライフプラン相談会、節約術シェア会）',
   },
   {
-    id: 'niche',
-    label: 'テーマ系',
+    id: 'earn',
+    label: '稼ぐ',
     direction:
-      '主催者の趣味・専門・経験を活かした特定テーマの会。刺さる人には強く刺さる会（例: 特定テーマの勉強会・体験会、マニアックな趣味の会、特定の悩みを語る会）',
+      '副業・IT・スキルアップで収入を増やす会（例: 副業もくもく会、プログラミング勉強会、ブログ/SNS運用会、せどり情報交換会）',
+  },
+  {
+    id: 'protect',
+    label: '守る',
+    direction:
+      '保険・税金・詐欺回避・リスク管理でお金を守る会（例: 保険を学ぶ会、確定申告もくもく会、詐欺・情報リテラシー勉強会）',
+  },
+  {
+    id: 'grow',
+    label: '増やす',
+    direction:
+      '投資（新NISA・株・投資信託等）でお金を増やす会（例: 新NISA勉強会、投資雑談会、米国株もくもく会、投資信託の情報交換会）',
+  },
+  {
+    id: 'use',
+    label: '使う',
+    direction:
+      'お金を使って人生を豊かにする会（例: ランチ会、BBQ、日帰り旅行、カフェ会、趣味の体験イベント）',
+  },
+  {
+    id: 'other',
+    label: 'その他',
+    direction:
+      '上記に当てはまらない雑談・交流全般の会（例: 雑談会、交流会、もくもく会、朝活、散歩会）',
   },
 ];
 
-const IDEAS_PER_CATEGORY = 10;
+const IDEAS_PER_CATEGORY = 4;
 const THEME_IDEAS_COUNT = 5;
 
 /** venuePreference に応じた開催形態の前提をプロンプトに追加するための文言 */
@@ -231,7 +255,7 @@ ${venuePreferenceDirective(profile)}
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
 - 会場手配・機材・事前準備のハードルが高い企画は避けること
 - ${IDEAS_PER_CATEGORY}件はテーマ・時間帯にバリエーションを持たせること
-- 主催者の興味・得意を反映しつつ、王道系では誰でも参加しやすい定番の形を大事にすること
+- 主催者の興味・得意を反映しつつ、初主催者が参加しやすい定番の形も大事にすること
 - personaとpurposeは企画ごとに具体的に変えること（汎用文の使い回しをしない）
 
 ## 出力形式（JSON）
@@ -331,7 +355,7 @@ ${venuePreferenceDirective(profile)}
     .filter((i) => i && i.title)
     .map((i) => ({
       id: crypto.randomUUID(),
-      category: 'niche' as IdeaCategory,
+      category: 'other' as IdeaCategory,
       title: String(i.title || ''),
       summary: String(i.summary || ''),
       persona: String(i.persona || ''),

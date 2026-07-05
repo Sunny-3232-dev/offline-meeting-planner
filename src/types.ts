@@ -31,7 +31,13 @@ export interface IdeaConcept {
   cherish: string[]; // 会で大切にしたいこと（2〜3個）
 }
 
-export type IdeaCategory = 'classic' | 'niche';
+export type IdeaCategory = 'save' | 'earn' | 'protect' | 'grow' | 'use' | 'other';
+
+// 旧カテゴリ値(classic/niche)や未知値を安全に正規化する。未知は 'other'
+export function normalizeIdeaCategory(cat: string | undefined | null): IdeaCategory {
+  const valid: IdeaCategory[] = ['save', 'earn', 'protect', 'grow', 'use', 'other'];
+  return valid.includes(cat as IdeaCategory) ? (cat as IdeaCategory) : 'other';
+}
 
 export interface PlanIdea extends IdeaConcept {
   id: string;
