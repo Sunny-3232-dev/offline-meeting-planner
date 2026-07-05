@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Manrope", "Noto Sans JP", "Hiragino Sans", sans-serif;
+}
+
+/* ── Custom Utilities (Tailwind v4) ── */
+
+@utility font-body {
+  font-family: 'Manrope', 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+}
+
+@utility animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@utility animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@utility animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+@utility animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
+
+@utility card-hover {
+  transition: all 0.2s ease;
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* ── 円卓プログレス: 生成待ちの灯（席の灯りがひとまわり） ── */
+@keyframes seat-glow {
+  0%, 100% { fill: #f1f5f9; stroke: #cbd5e1; }
+  18%      { fill: #fbbf24; stroke: #f59e0b; }
+  46%      { fill: #fef3c7; stroke: #f59e0b; }
+}
+
+.entaku-loading .seat {
+  animation: seat-glow 2.4s ease-in-out infinite;
+}
+.entaku-loading .seat-1 { animation-delay: 0s; }
+.entaku-loading .seat-2 { animation-delay: 0.3s; }
+.entaku-loading .seat-3 { animation-delay: 0.6s; }
+.entaku-loading .seat-4 { animation-delay: 0.9s; }
+.entaku-loading .seat-5 { animation-delay: 1.2s; }
+.entaku-loading .seat-6 { animation-delay: 1.5s; }
+.entaku-loading .seat-7 { animation-delay: 1.8s; }
+.entaku-loading .seat-8 { animation-delay: 2.1s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .entaku-loading .seat {
+    animation: none;
+    fill: #fef3c7;
+    stroke: #f59e0b;
+  }
+}
+
+@utility hub-hero-orb-1 {
+  position: absolute;
+  top: 80px;
+  left: 40px;
+  width: 256px;
+  height: 256px;
+  background: #0ea5e9;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+@utility hub-hero-orb-2 {
+  position: absolute;
+  bottom: 80px;
+  right: 40px;
+  width: 384px;
+  height: 384px;
+  background: #fde68a;
+  border-radius: 50%;
+  filter: blur(150px);
+  opacity: 0.25;
+  pointer-events: none;
+}

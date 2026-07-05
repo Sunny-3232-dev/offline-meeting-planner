@@ -1,5 +1,8 @@
 {
-  "name": "Copy of Skill Market Creator Pro(New)",
-  "description": "A comprehensive suite of AI tools for skill market sellers: Idea Creation, Promotion, and Market Research.",
-  "requestFramePermissions": []
+  "name": "オフ会Creator",
+  "description": "はじめてのオフ会主催を、企画から告知まで背中を押すツール",
+  "version": "0.1.0",
+  "icon": "🎉",
+  "tags": ["event", "offkai", "community", "ai"],
+  "entrypoint": "index.html"
 }
