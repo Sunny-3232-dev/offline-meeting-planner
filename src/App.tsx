@@ -40,7 +40,7 @@ import {
   generateShareTexts,
 } from './services/geminiService';
 import { computeTimeRanges, formatDateJa } from './utils/time';
-import { MAX_PINNED_IDEAS, MAX_SAVED_EVENTS } from './constants';
+import { MAX_PINNED_IDEAS, MAX_SAVED_EVENTS, officeLabel } from './constants';
 import StepIndicator, { stepOrder } from './components/StepIndicator';
 import LoadingOverlay from './components/LoadingOverlay';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -122,8 +122,14 @@ function announcementSourceFingerprint(
 ): string {
   return `${basicsFingerprint(basics)}|${conceptFingerprint(concept)}|${scheduleFingerprint(schedule)}`;
 }
-function shareSourceFingerprint(basics: EventBasics, announcement: string, desiredArea: string): string {
-  return `${basicsFingerprint(basics)}|${announcement}|${desiredArea}`;
+function shareSourceFingerprint(basics: EventBasics, announcement: string, regionHint: string): string {
+  return `${basicsFingerprint(basics)}|${announcement}|${regionHint}`;
+}
+
+/** 支部チャット推定のための地域ヒント: 公式オフィス名、またはその他対面の会場テキスト（オンラインは空） */
+function computeRegionHint(basics: EventBasics): string {
+  if (basics.officeKey) return officeLabel(basics.officeKey);
+  return basics.venueType === 'offline' ? basics.venueDetail : '';
 }
 
 function getAutoApiKey(): string {
@@ -481,7 +487,7 @@ function AppContent() {
     }
   }, [apiKey, activeIdea, basics, ensureApiKey]);
 
-  const runGenerateSchedule = useCallback(async (opts?: { confirm?: boolean }) => {
+  const runGenerateSchedule = useCallback(async (opts?: { confirm?: boolean; feedback?: string }) => {
     if (!ensureApiKey() || !concept || !activeIdea) return;
     if (opts?.confirm && schedule.length > 0) {
       const ok = await confirmDialog('進行イメージをAIで作り直すと、いまの編集内容は上書きされます。よろしいですか？');
@@ -492,7 +498,7 @@ function AppContent() {
     setLoadingSourceText(`${basics.title} ${basics.durationMinutes}分 ${basics.capacity}人`);
     setError(null);
     try {
-      const items = await generateSchedule(apiKey, basics, concept, activeIdea);
+      const items = await generateSchedule(apiKey, basics, concept, activeIdea, opts?.feedback);
       setSchedule(items.map((i) => ({ ...i, id: crypto.randomUUID() })));
       setScheduleSourceKey(basicsConceptFingerprint(basics, concept));
     } catch (e: any) {
@@ -585,17 +591,18 @@ function AppContent() {
     setLoadingMessage('チャット・つぶやき用の文章を書いています...');
     setLoadingSourceText(announcement.slice(0, 200));
     setError(null);
+    const regionHint = computeRegionHint(basics);
     try {
       setShareTexts(
-        await generateShareTexts(apiKey, announcement, basics, profile.desiredArea, formatDateJa(basics.date))
+        await generateShareTexts(apiKey, announcement, basics, regionHint, formatDateJa(basics.date))
       );
-      setShareSourceKey(shareSourceFingerprint(basics, announcement, profile.desiredArea));
+      setShareSourceKey(shareSourceFingerprint(basics, announcement, regionHint));
     } catch (e: any) {
       setError(e?.message || '展開用文章の生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, announcement, basics, profile.desiredArea, ensureApiKey]);
+  }, [apiKey, announcement, basics, ensureApiKey]);
 
   const runGenerateIdeas = useCallback(async () => {
     if (!ensureApiKey()) return;
@@ -787,7 +794,7 @@ function AppContent() {
             schedule={schedule}
             basics={basics}
             onChange={setSchedule}
-            onRegenerate={() => runGenerateSchedule({ confirm: true })}
+            onRegenerate={(feedback) => runGenerateSchedule({ confirm: true, feedback })}
             onNext={async () => {
               // 基本情報・進行イメージを変更した後だと、既存の詳細文は前提が食い違っている可能性がある
               const currentKey = announcementSourceFingerprint(basics, concept, schedule);
@@ -814,7 +821,6 @@ function AppContent() {
         return (
           <AnnouncementStep
             announcement={announcement}
-            tags={eventTags}
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
             onNext={() => {
@@ -847,7 +853,7 @@ function AppContent() {
             eventTags={eventTags}
             onNext={async () => {
               // 詳細（公開情報）を書き直した後だと、既存の展開用文章は前提が食い違っている可能性がある
-              const currentKey = shareSourceFingerprint(basics, announcement, profile.desiredArea);
+              const currentKey = shareSourceFingerprint(basics, announcement, computeRegionHint(basics));
               const stale = !!shareTexts && shareSourceKey !== '' && currentKey !== shareSourceKey;
               if (stale) {
                 const ok = await confirmDialog('詳細（公開情報）が変更されています。展開用の文章を作り直しますか？');
@@ -869,7 +875,7 @@ function AppContent() {
           <ShareStep
             shareTexts={shareTexts}
             basics={basics}
-            region={profile.desiredArea}
+            region={computeRegionHint(basics)}
             offkaiChatUrl={offkaiChatUrl}
             onChangeChatUrl={setOffkaiChatUrl}
             onGenerate={runGenerateShareTexts}

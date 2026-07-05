@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CopyIcon, CheckIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon } from './icons';
 
 interface AnnouncementStepProps {
   announcement: string;
-  tags: string[];
   onChange: (text: string) => void;
   /** feedbackが空文字の場合は初回生成（同条件での再生成）、それ以外は要望を反映して書き直す */
   onRegenerate: (feedback: string) => void;
@@ -13,35 +12,12 @@ interface AnnouncementStepProps {
 
 export default function AnnouncementStep({
   announcement,
-  tags,
   onChange,
   onRegenerate,
   onNext,
   onBack,
 }: AnnouncementStepProps) {
-  const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const [tagsCopied, setTagsCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(announcement);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // クリップボード不可の環境では選択を促す
-    }
-  };
-
-  const handleCopyTags = async () => {
-    try {
-      await navigator.clipboard.writeText(tags.join(' '));
-      setTagsCopied(true);
-      setTimeout(() => setTagsCopied(false), 2000);
-    } catch {
-      // noop
-    }
-  };
 
   const handleRewrite = () => {
     onRegenerate(feedback);
@@ -66,44 +42,8 @@ export default function AnnouncementStep({
               aria-label="詳細（公開情報）"
               className="w-full px-4 py-4 text-sm leading-relaxed border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
             />
-            <button
-              onClick={handleCopy}
-              className={`absolute top-3 right-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shadow transition-colors ${
-                copied ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
-              }`}
-            >
-              {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-              {copied ? 'コピーしました' : 'コピー'}
-            </button>
           </div>
           <p className="text-xs text-slate-400 mb-4">{announcement.length}文字</p>
-
-          {tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold text-slate-700">適切なタグ</h3>
-                <button
-                  onClick={handleCopyTags}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    tagsCopied ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
-                  }`}
-                >
-                  {tagsCopied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
-                  {tagsCopied ? 'コピーしました' : 'タグをコピー'}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-8">
             <label htmlFor="announcementFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">

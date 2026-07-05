@@ -92,6 +92,9 @@ export default function ChatSetupStep({
           <SendIcon size={15} />
           リベシティでオフ会チャットを作成する
         </a>
+        <p className="mt-3 text-xs text-sky-600/70">
+          Chromeの画面2分割機能を使い、左に「オフ会プランナー」、右にリベシティのチャット作成フォームを並べると、左から右へコピー＆ペーストでスムーズに転記できます。
+        </p>
       </div>
 
       <div className="space-y-3 mb-8">

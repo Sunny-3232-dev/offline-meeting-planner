@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScheduleItem, EventBasics } from '../types';
 import { computeTimeRanges, totalDuration } from '../utils/time';
 import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, PlusIcon, TrashIcon } from './icons';
@@ -7,7 +7,8 @@ interface ScheduleStepProps {
   schedule: ScheduleItem[];
   basics: EventBasics;
   onChange: (schedule: ScheduleItem[]) => void;
-  onRegenerate: () => void;
+  /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
+  onRegenerate: (feedback: string) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -27,6 +28,12 @@ export default function ScheduleStep({
   const ranges = computeTimeRanges(basics.startTime, schedule);
   const total = totalDuration(schedule);
   const diff = total - basics.durationMinutes;
+  const [feedback, setFeedback] = useState('');
+
+  const handleRegenerate = () => {
+    onRegenerate(feedback);
+    setFeedback('');
+  };
 
   const update = (id: string, patch: Partial<ScheduleItem>) => {
     onChange(schedule.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -59,7 +66,7 @@ export default function ScheduleStep({
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center mb-6">
           <p className="text-sm text-slate-500 mb-4">まだ進行イメージがありません</p>
           <button
-            onClick={onRegenerate}
+            onClick={() => onRegenerate('')}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition-colors"
           >
             AIに進行イメージを作ってもらう
@@ -167,6 +174,29 @@ export default function ScheduleStep({
         </div>
       )}
 
+      {schedule.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-8">
+          <label htmlFor="scheduleFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
+            AIに作り直してほしい点を教えてください
+          </label>
+          <textarea
+            id="scheduleFeedback"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            rows={2}
+            placeholder="例: もっとカジュアルに／休憩を1つ増やして／自己紹介を長めに"
+            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white mb-2"
+          />
+          <button
+            onClick={handleRegenerate}
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+          >
+            <RefreshIcon size={13} />
+            AIで作り直す
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -176,15 +206,6 @@ export default function ScheduleStep({
             <ChevronLeftIcon size={16} />
             基本情報に戻る
           </button>
-          {schedule.length > 0 && (
-            <button
-              onClick={onRegenerate}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-white border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
-            >
-              <RefreshIcon size={15} />
-              AIで作り直す
-            </button>
-          )}
         </div>
         <button
           onClick={onNext}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { EventBasics, PlanIdea, VenueType } from '../types';
+import { EventBasics, PlanIdea } from '../types';
 import { DURATION_OPTIONS, OFFICIAL_OFFICES, officeLabel } from '../constants';
 import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon } from './icons';
 
@@ -139,26 +139,11 @@ export default function BasicsStep({
           <span className="block text-sm font-semibold text-slate-700 mb-1.5">
             場所 <span className="text-red-500 text-xs">必須</span>
           </span>
-          <div className="flex gap-2 mb-2" role="radiogroup" aria-label="開催形態">
-            {([
-              { type: 'offline' as VenueType, label: 'オフライン（対面）' },
-              { type: 'online' as VenueType, label: 'オンライン' },
-            ]).map((v) => (
-              <button
-                key={v.type}
-                type="button"
-                role="radio"
-                aria-checked={basics.venueType === v.type}
-                onClick={() => set({ venueType: v.type, ...(v.type === 'online' ? { officeKey: '' } : {}) })}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  basics.venueType === v.type
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-4 py-2 rounded-full text-sm font-medium bg-sky-600 text-white">
+              開催形態： {basics.venueType === 'offline' ? 'オフライン（対面）' : 'オンライン'}
+            </span>
+            <span className="text-xs text-slate-400">（プロフィールで選択）</span>
           </div>
 
           {/* オフライン時: 公式オフィスかどうか */}

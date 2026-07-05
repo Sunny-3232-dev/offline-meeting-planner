@@ -460,8 +460,14 @@ export async function generateSchedule(
   apiKey: string,
   basics: EventBasics,
   concept: IdeaConcept,
-  idea: PlanIdea
+  idea: PlanIdea,
+  feedback?: string
 ): Promise<Omit<ScheduleItem, 'id'>[]> {
+  const feedbackSection =
+    feedback && feedback.trim()
+      ? `\n## 作り直しの要望（最優先で反映）\n${feedback.trim()}\n`
+      : '';
+
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 初めてオフ会を主催する人のために、当日の進行イメージ（タイムスケジュール）を作ってください。
 
@@ -473,7 +479,7 @@ export async function generateSchedule(
 - 開催時間: ${basics.durationMinutes}分
 - 定員: ${basics.capacity}人（主催者含む）
 ${conceptLines(concept)}
-
+${feedbackSection}
 ## 進行イメージの条件
 - 各項目は {title, description, durationMinutes} で構成
 - **durationMinutesの合計が必ず${basics.durationMinutes}分ちょうどになること**
@@ -715,6 +721,7 @@ export async function generateThumbnailAssets(
 - 日時「${dateTimeText}」と場所「${placeText}」を、タイトルより小さく読みやすいサイズで画像内に配置すること
 - 文字は背景との十分なコントラストを確保し、はっきり読めるようにすること
 - 明るく参加したくなる配色
+- 「参考画像（オフ会のチャットアイコンなど）が添付されている場合は、その画像のキャラクターやモチーフを、雰囲気を損なわないよう自然にサムネイル内へ配置・反映すること。」という一文を必ず含めること
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。imagePromptに完成したプロンプト全文を入れること。

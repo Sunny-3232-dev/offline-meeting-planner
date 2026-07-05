@@ -8,8 +8,6 @@ interface ProfileInputProps {
   onNext: () => void;
 }
 
-const AREA_EXAMPLES = ['北海道', '東北', '関東', '中部', '関西', '中国', '四国', '九州・沖縄'];
-
 export default function ProfileInput({ profile, onChange, onNext }: ProfileInputProps) {
   const canProceed = profile.selfIntro.trim().length >= 10 && profile.interests.trim().length >= 2;
 
@@ -77,38 +75,6 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
               </button>
             ))}
           </div>
-
-          {profile.venuePreference === 'offline' && (
-            <div className="mt-3">
-              <label htmlFor="desiredArea" className="block text-xs text-slate-500 mb-1">
-                開催したいエリア
-              </label>
-              <input
-                id="desiredArea"
-                type="text"
-                value={profile.desiredArea}
-                onChange={(e) => set({ desiredArea: e.target.value })}
-                placeholder="例: 関東（東京）"
-                className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {AREA_EXAMPLES.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => set({ desiredArea: r })}
-                    className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                      profile.desiredArea === r
-                        ? 'bg-sky-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div>

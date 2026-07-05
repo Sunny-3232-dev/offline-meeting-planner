@@ -12,6 +12,12 @@ function buildTweetText(body: string, chatUrl: string): string {
   return url ? `${body.trim()}\n${url}` : body.trim();
 }
 
+/** 本文 + URL（任意）を改行2つで結合する（支部チャット向けの長文用） */
+function appendUrl(text: string, url: string): string {
+  const trimmedUrl = url.trim();
+  return trimmedUrl ? `${text.trim()}\n\n${trimmedUrl}` : text.trim();
+}
+
 /** 本文プリセット済みのつぶやき作成画面URL（既存ツールと同じ導線） */
 function buildLibetterUrl(text: string): string {
   return `https://libecity.com/tweet/all?create=${encodeURIComponent(text)}`;
@@ -150,8 +156,8 @@ export default function ShareStep({
 
           <CopyCard
             title={`${branch ? branch.name : `${region || '地域'}支部`}チャット向け`}
-            hint="上のボタンで支部チャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも一緒に）"
-            text={shareTexts.regionalChat}
+            hint="上のボタンで支部チャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
+            text={appendUrl(shareTexts.regionalChat, offkaiChatUrl)}
           />
 
           {/* つぶやき: すぐ呟ける導線 */}
