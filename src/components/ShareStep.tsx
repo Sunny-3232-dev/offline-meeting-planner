@@ -22,6 +22,7 @@ interface ShareStepProps {
   basics: EventBasics;
   region: string;
   offkaiChatUrl: string;
+  onChangeChatUrl: (url: string) => void;
   onGenerate: () => void;
   onBack: () => void;
   onFinish: () => void;
@@ -73,6 +74,7 @@ export default function ShareStep({
   basics,
   region,
   offkaiChatUrl,
+  onChangeChatUrl,
   onGenerate,
   onBack,
   onFinish,
@@ -91,6 +93,20 @@ export default function ShareStep({
       <p className="text-sm text-slate-500 mb-6">
         支部チャットとつぶやきで、作成したオフ会チャットへの参加を呼びかけましょう。
       </p>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-4">
+        <label htmlFor="offkaiChatUrl" className="block text-xs font-semibold text-slate-700 mb-1">
+          作成したオフ会チャットのURL（つぶやきに自動で添付されます）
+        </label>
+        <input
+          id="offkaiChatUrl"
+          type="url"
+          value={offkaiChatUrl}
+          onChange={(e) => onChangeChatUrl(e.target.value)}
+          placeholder="https://libecity.com/room_list?room_id=..."
+          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+        />
+      </div>
 
       {shareTexts ? (
         <div className="space-y-4 mb-8">

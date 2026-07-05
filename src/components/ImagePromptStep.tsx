@@ -106,18 +106,6 @@ export default function ImagePromptStep({
               <h4 className="text-sm font-bold text-slate-700">チャットアイコン生成プロンプト</h4>
               <CopyButton text={iconPrompt.prompt} label="プロンプトをコピー" />
             </div>
-            {iconPrompt.keywords.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {iconPrompt.keywords.map((k, i) => (
-                  <span
-                    key={i}
-                    className="px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium"
-                  >
-                    {k}
-                  </span>
-                ))}
-              </div>
-            )}
             <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-4 whitespace-pre-wrap break-words mb-3">
               {iconPrompt.prompt}
             </p>

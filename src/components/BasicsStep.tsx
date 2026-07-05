@@ -1,7 +1,13 @@
 import React from 'react';
 import { EventBasics, PlanIdea, VenueType } from '../types';
 import { DURATION_OPTIONS, OFFICIAL_OFFICES, officeLabel } from '../constants';
-import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon, LightbulbIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon } from './icons';
+
+const ONLINE_TOOLS = ['oVice', 'Zoom', 'Google Meet', 'Teams', 'other'] as const;
+
+function onlineToolLabel(tool: string): string {
+  return tool === 'other' ? 'その他' : tool;
+}
 
 interface BasicsStepProps {
   basics: EventBasics;
@@ -220,25 +226,58 @@ export default function BasicsStep({
             </div>
           )}
 
-          <input
-            type="text"
-            value={basics.venueDetail}
-            onChange={(e) => set({ venueDetail: e.target.value })}
-            aria-label="場所の詳細"
-            placeholder={
-              basics.venueType === 'online'
-                ? '例: Zoom（URLは参加者に後日連絡）'
-                : basics.officeKey
+          {/* オンライン時: 開催ツール選択 */}
+          {basics.venueType === 'online' && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">
+              <div className="flex flex-wrap gap-2 mb-2" role="radiogroup" aria-label="開催ツール">
+                {ONLINE_TOOLS.map((tool) => (
+                  <button
+                    key={tool}
+                    type="button"
+                    role="radio"
+                    aria-checked={basics.onlineTool === tool}
+                    onClick={() =>
+                      set({
+                        onlineTool: tool,
+                        venueDetail: tool === 'other' ? basics.onlineToolOther : tool,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      basics.onlineTool === tool
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {onlineToolLabel(tool)}
+                  </button>
+                ))}
+              </div>
+              {basics.onlineTool === 'other' && (
+                <input
+                  type="text"
+                  value={basics.onlineToolOther}
+                  onChange={(e) => set({ onlineToolOther: e.target.value, venueDetail: e.target.value })}
+                  placeholder="例: Discord"
+                  aria-label="その他の開催ツール"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+                />
+              )}
+            </div>
+          )}
+
+          {basics.venueType !== 'online' && (
+            <input
+              type="text"
+              value={basics.venueDetail}
+              onChange={(e) => set({ venueDetail: e.target.value })}
+              aria-label="場所の詳細"
+              placeholder={
+                basics.officeKey
                   ? 'オフィスを選ぶと自動入力されます'
                   : '例: 東京駅周辺のカフェ（お店は人数確定後に予約）'
-            }
-            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
-          {idea && (
-            <p className="mt-1 text-xs text-slate-400 flex items-center gap-1">
-              <LightbulbIcon size={13} className="shrink-0" />
-              この企画に向いている場所: {idea.venueHint}
-            </p>
+              }
+              className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+            />
           )}
         </section>
 

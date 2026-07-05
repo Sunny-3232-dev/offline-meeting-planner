@@ -7,6 +7,8 @@ interface IdeasStepProps {
   ideas: PlanIdea[];
   selectedIdeaId: string | null;
   pinnedIds: string[];
+  /** プロフィールで指定されたテーマ（空なら王道系・テーマ系を提案した旨の説明文になる） */
+  plannedTheme?: string;
   onSelect: (id: string) => void;
   onTogglePin: (id: string) => void;
   onRegenerate: () => void;
@@ -25,9 +27,9 @@ const CATEGORY_META: Record<IdeaCategory, { label: string; Icon: React.Component
     accent: 'text-sky-700',
   },
   niche: {
-    label: 'ニッチ系',
+    label: 'テーマ系',
     Icon: DiamondIcon,
-    desc: 'あなたの得意を活かす。刺さる人には強く刺さる',
+    desc: 'あなたの好き・得意を深掘りする会。刺さる人には強く刺さる',
     bg: 'bg-purple-50',
     border: 'border-purple-200',
     accent: 'text-purple-700',
@@ -126,6 +128,7 @@ export default function IdeasStep({
   ideas,
   selectedIdeaId,
   pinnedIds,
+  plannedTheme,
   onSelect,
   onTogglePin,
   onRegenerate,
@@ -155,7 +158,9 @@ export default function IdeasStep({
     <div className="max-w-4xl mx-auto py-8 animate-fade-in">
       <h2 className="text-2xl font-bold text-slate-800 mb-2">どのオフ会を開いてみますか？</h2>
       <p className="text-sm text-slate-500 mb-1">
-        あなたのプロフィールから、王道系・ニッチ系を10案ずつ提案しました。
+        {plannedTheme && plannedTheme.trim()
+          ? `テーマ「${plannedTheme}」に沿った企画案を提案しました。`
+          : 'あなたのプロフィールから、王道系・テーマ系を10案ずつ提案しました。'}
       </p>
       <p className="text-xs text-slate-400 mb-6">
         気になった案は灯マークでピン留め（最大{MAX_PINNED_IDEAS}件・「別の案を出す」でも消えません）／ カードを<b>ダブルクリック</b>するとその企画に決めて次へ進みます

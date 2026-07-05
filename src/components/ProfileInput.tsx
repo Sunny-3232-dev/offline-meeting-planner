@@ -1,5 +1,5 @@
 import React from 'react';
-import { OrganizerProfile } from '../types';
+import { OrganizerProfile, VenueType } from '../types';
 import { ArrowRightIcon } from './icons';
 
 interface ProfileInputProps {
@@ -8,7 +8,7 @@ interface ProfileInputProps {
   onNext: () => void;
 }
 
-const REGION_EXAMPLES = ['北海道', '東北', '関東', '中部', '関西', '中国', '四国', '九州・沖縄', 'オンライン中心'];
+const AREA_EXAMPLES = ['北海道', '東北', '関東', '中部', '関西', '中国', '四国', '九州・沖縄'];
 
 export default function ProfileInput({ profile, onChange, onNext }: ProfileInputProps) {
   const canProceed = profile.selfIntro.trim().length >= 10 && profile.interests.trim().length >= 2;
@@ -53,33 +53,76 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
         </div>
 
         <div>
-          <label htmlFor="region" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            住んでいる地域
-          </label>
-          <input
-            id="region"
-            type="text"
-            value={profile.region}
-            onChange={(e) => set({ region: e.target.value })}
-            placeholder="例: 関東（東京）"
-            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {REGION_EXAMPLES.map((r) => (
+          <span className="block text-sm font-semibold text-slate-700 mb-1.5">
+            どこで開催したいですか？ <span className="text-red-500 text-xs">必須</span>
+          </span>
+          <div className="flex gap-2" role="radiogroup" aria-label="開催したい場所">
+            {([
+              { type: 'offline' as VenueType, label: '対面（オフライン）' },
+              { type: 'online' as VenueType, label: 'オンライン' },
+            ]).map((v) => (
               <button
-                key={r}
+                key={v.type}
                 type="button"
-                onClick={() => set({ region: r })}
-                className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                  profile.region === r
+                role="radio"
+                aria-checked={profile.venuePreference === v.type}
+                onClick={() => set({ venuePreference: v.type })}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  profile.venuePreference === v.type
                     ? 'bg-sky-600 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                {r}
+                {v.label}
               </button>
             ))}
           </div>
+
+          {profile.venuePreference === 'offline' && (
+            <div className="mt-3">
+              <label htmlFor="desiredArea" className="block text-xs text-slate-500 mb-1">
+                開催したいエリア
+              </label>
+              <input
+                id="desiredArea"
+                type="text"
+                value={profile.desiredArea}
+                onChange={(e) => set({ desiredArea: e.target.value })}
+                placeholder="例: 関東（東京）"
+                className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {AREA_EXAMPLES.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => set({ desiredArea: r })}
+                    className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                      profile.desiredArea === r
+                        ? 'bg-sky-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="plannedTheme" className="block text-sm font-semibold text-slate-700 mb-1.5">
+            既に企画が決まっていますか？ <span className="text-slate-400 text-xs">任意</span>
+          </label>
+          <input
+            id="plannedTheme"
+            type="text"
+            value={profile.plannedTheme}
+            onChange={(e) => set({ plannedTheme: e.target.value })}
+            placeholder="例: ボードゲーム会、Claude Code勉強会。空欄ならAIが企画案をゼロから提案します"
+            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+          />
         </div>
 
         <div>

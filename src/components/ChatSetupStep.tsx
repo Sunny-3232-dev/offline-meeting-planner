@@ -1,34 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { EventBasics } from '../types';
 import { LIBECITY_EVENT_CREATE_URL } from '../constants';
-import { ArrowRightIcon, ChevronLeftIcon, SendIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, SendIcon, CopyIcon, CheckIcon } from './icons';
 
 interface ChatSetupStepProps {
   basics: EventBasics;
-  offkaiChatUrl: string;
-  onChangeChatUrl: (url: string) => void;
+  announcement: string;
+  eventTags: string[];
   onNext: () => void;
   onBack: () => void;
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // noop
+    }
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium shrink-0 transition-colors ${
+        copied ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
+      }`}
+    >
+      {copied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+      {copied ? 'コピーしました' : 'コピー'}
+    </button>
+  );
+}
+
+function CopyField({
+  label,
+  value,
+  longText = false,
+}: {
+  label: string;
+  value: string;
+  longText?: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-sm font-bold text-slate-700">{label}</h3>
+        <CopyButton text={value} />
+      </div>
+      <p
+        className={`text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 whitespace-pre-wrap break-words ${
+          longText ? 'max-h-64 overflow-y-auto' : ''
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export default function ChatSetupStep({
   basics,
-  offkaiChatUrl,
-  onChangeChatUrl,
+  announcement,
+  eventTags,
   onNext,
   onBack,
 }: ChatSetupStepProps) {
+  const tagsText = eventTags.join(' ');
+  const isOfficialOffice = !!basics.officeKey;
+
   return (
     <div className="max-w-2xl mx-auto py-8 animate-fade-in">
       <h2 className="text-2xl font-bold text-slate-800 mb-2">オフ会チャットを立ち上げましょう</h2>
       <p className="text-sm text-slate-500 mb-6">
-        リベシティにオフ会チャットを作成し、そのURLを控えておくと、次の告知ステップでつぶやきに自動で添付できます。
+        リベシティのオフ会チャット作成フォームへ転記する材料をここに集めました。各項目をコピーしてフォームに貼り付けてください。
       </p>
 
-      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 mb-4">
+      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 mb-6">
         <p className="text-xs text-sky-700 mb-3">
           リベシティのチャット一覧を開き、左下の「＋チャット作成」→「オフ会チャットを新規作成」を選ぶと作成フォームが開きます。
-          「{basics.title}」のタイトル・日時・定員と、「詳細（公開情報）」ステップで作った文章を詳細欄にそのまま転記できます
           （「イベント・オフ会カレンダーに登録する」にチェックを入れるとイベント案内にも載ります）。
         </p>
         <a
@@ -40,18 +92,32 @@ export default function ChatSetupStep({
           <SendIcon size={15} />
           リベシティでオフ会チャットを作成する
         </a>
-        <div className="mt-4 pt-4 border-t border-sky-200/60">
-          <label htmlFor="offkaiChatUrl" className="block text-xs font-semibold text-sky-800 mb-1">
-            作成したオフ会チャットのURL（次の告知ステップでつぶやきに自動で添付されます）
-          </label>
-          <input
-            id="offkaiChatUrl"
-            type="url"
-            value={offkaiChatUrl}
-            onChange={(e) => onChangeChatUrl(e.target.value)}
-            placeholder="https://libecity.com/room_list?room_id=..."
-            className="w-full px-3 py-2 text-sm border border-sky-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
+      </div>
+
+      <div className="space-y-3 mb-8">
+        <CopyField label="オフ会チャットルーム名" value={basics.title} />
+        <CopyField label="定員" value={`${basics.capacity}`} />
+        <CopyField label="タグ" value={tagsText} />
+        <CopyField label="詳細（公開）情報" value={announcement} longText />
+
+        {/* チャット参加者への限定公開情報 */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <h3 className="text-sm font-bold text-slate-700 mb-2">チャット参加者への限定公開情報</h3>
+          {isOfficialOffice ? (
+            <p className="text-xs text-slate-400">
+              公式オフィス開催のため、限定公開情報は特にありません（必要なら当日の集合場所メモなどを）
+            </p>
+          ) : (
+            <div>
+              <div className="flex items-center justify-end mb-2">
+                <CopyButton text={'開催場所：\n（場所が確定したら、オフ会会場の詳細はこの限定公開情報へ記載しましょう）'} />
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 whitespace-pre-wrap">
+                開催場所：{'\n'}
+                （場所が確定したら、オフ会会場の詳細はこの限定公開情報へ記載しましょう）
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -18,14 +18,14 @@ interface HubProps {
 }
 
 const FLOW = [
-  { Icon: UserIcon, title: 'プロフィール', desc: 'あなたの興味と地域を入力' },
-  { Icon: LightbulbIcon, title: '企画案', desc: '王道系・ニッチ系を10案ずつ。ピン留めして選べる（最大4件）' },
+  { Icon: UserIcon, title: 'プロフィール', desc: 'あなたの興味と開催したい場所を入力' },
+  { Icon: LightbulbIcon, title: '企画案', desc: '王道系・テーマ系を提案。ピン留めして選べる' },
   { Icon: CalendarIcon, title: '基本情報', desc: 'タイトル・日時・場所・定員' },
   { Icon: ClockIcon, title: '進行イメージ', desc: '当日の大まかな流れ' },
   { Icon: FileTextIcon, title: '詳細情報', desc: 'そのまま貼れる公開情報の文章' },
   { Icon: ImageIcon, title: '画像', desc: 'アイコンとサムネのプロンプト' },
-  { Icon: MessagePlusIcon, title: 'チャット作成', desc: 'リベシティにオフ会チャットを立ち上げる' },
-  { Icon: MegaphoneIcon, title: '告知', desc: '支部チャット・つぶやきで広める' },
+  { Icon: MessagePlusIcon, title: 'チャット作成', desc: '転記材料をコピーしてチャットを立ち上げる' },
+  { Icon: MegaphoneIcon, title: '告知', desc: 'チャットURLを添えて支部チャット・つぶやきで広める' },
 ];
 
 function eventTitle(ev: SavedEvent): string {

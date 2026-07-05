@@ -14,7 +14,7 @@ const PHASES: { keywords: string[]; flavorTexts: string[] }[] = [
     keywords: ['企画', 'アイデア'],
     flavorTexts: [
       'あなたに合うオフ会を考えています',
-      '王道系・ニッチ系を出しています',
+      '王道系・テーマ系を出しています',
       '初主催でもやりやすい形を選んでいます',
     ],
   },
@@ -44,10 +44,10 @@ const PHASES: { keywords: string[]; flavorTexts: string[] }[] = [
   },
 ];
 
-const DEFAULT_FLAVORS = ['オフ会Creatorが考えています', 'もう少しだけお待ちください'];
+const DEFAULT_FLAVORS = ['オフ会プランナーが考えています', 'もう少しだけお待ちください'];
 
 export default function LoadingOverlay({
-  message = 'オフ会Creatorが考えています...',
+  message = 'オフ会プランナーが考えています...',
   subMessage = 'しばらくお待ちください',
 }: LoadingOverlayProps) {
   const flavorTexts = useMemo(() => {

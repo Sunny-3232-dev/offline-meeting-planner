@@ -12,6 +12,7 @@ import {
   EventSnapshot,
   SavedEvent,
 } from './types';
+import type { AnnouncementResult } from './types';
 import {
   saveToStorage,
   loadFromStorage,
@@ -50,7 +51,9 @@ import { confirmDialog, ConfirmDialogHost } from './utils/confirmDialog';
 const INITIAL_PROFILE: OrganizerProfile = {
   selfIntro: '',
   interests: '',
-  region: '',
+  venuePreference: 'offline',
+  desiredArea: '',
+  plannedTheme: '',
   hostingConcern: '',
 };
 
@@ -65,11 +68,24 @@ const INITIAL_BASICS: EventBasics = {
   venueDetail: '',
   capacity: 6,
   capacitySuggestion: null,
+  onlineTool: '',
+  onlineToolOther: '',
 };
 
 /** 旧バージョンの保存データにofficeKey等が無くても壊れないようにマージする */
 function migrateBasics(stored: Partial<EventBasics> | null): EventBasics {
   return { ...INITIAL_BASICS, ...(stored || {}) };
+}
+
+/** 旧バージョンの保存データ（region）を新フィールド（desiredArea/venuePreference）へ移行する */
+function migrateProfile(stored: (Partial<OrganizerProfile> & { region?: string }) | null): OrganizerProfile {
+  if (!stored) return INITIAL_PROFILE;
+  const { region, ...rest } = stored;
+  const migrated: OrganizerProfile = { ...INITIAL_PROFILE, ...rest };
+  if (region && !migrated.desiredArea) {
+    migrated.desiredArea = region;
+  }
+  return migrated;
 }
 
 // ── 前工程の変更検知（指紋） ──────────────────────────
@@ -86,6 +102,8 @@ function basicsFingerprint(basics: EventBasics): string {
     officeKey: basics.officeKey,
     venueDetail: basics.venueDetail,
     capacity: basics.capacity,
+    onlineTool: basics.onlineTool,
+    onlineToolOther: basics.onlineToolOther,
   });
 }
 function conceptFingerprint(concept: IdeaConcept | null): string {
@@ -104,8 +122,8 @@ function announcementSourceFingerprint(
 ): string {
   return `${basicsFingerprint(basics)}|${conceptFingerprint(concept)}|${scheduleFingerprint(schedule)}`;
 }
-function shareSourceFingerprint(basics: EventBasics, announcement: string, region: string): string {
-  return `${basicsFingerprint(basics)}|${announcement}|${region}`;
+function shareSourceFingerprint(basics: EventBasics, announcement: string, desiredArea: string): string {
+  return `${basicsFingerprint(basics)}|${announcement}|${desiredArea}`;
 }
 
 function getAutoApiKey(): string {
@@ -151,7 +169,7 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<OrganizerProfile>(
-    () => loadFromStorage<OrganizerProfile>('profile') || INITIAL_PROFILE
+    () => migrateProfile(loadFromStorage<OrganizerProfile>('profile'))
   );
   const [concept, setConcept] = useState<IdeaConcept | null>(
     () => loadFromStorage<IdeaConcept>('concept')
@@ -184,6 +202,9 @@ function AppContent() {
   );
   const [announcement, setAnnouncement] = useState<string>(
     () => loadFromStorage<string>('announcement') || ''
+  );
+  const [eventTags, setEventTags] = useState<string[]>(
+    () => loadFromStorage<string[]>('eventTags') || []
   );
   const [iconPrompt, setIconPrompt] = useState<IconPromptResult | null>(
     () => loadFromStorage<IconPromptResult>('iconPrompt')
@@ -266,6 +287,7 @@ function AppContent() {
   useEffect(() => { saveToStorage('thumbnailAssets', thumbnailAssets); }, [thumbnailAssets]);
   useEffect(() => { saveToStorage('shareTexts', shareTexts); }, [shareTexts]);
   useEffect(() => { saveToStorage('offkaiChatUrl', offkaiChatUrl); }, [offkaiChatUrl]);
+  useEffect(() => { saveToStorage('eventTags', eventTags); }, [eventTags]);
   useEffect(() => { saveToStorage('events', events); }, [events]);
   useEffect(() => { saveToStorage('activeEventId', activeEventId); }, [activeEventId]);
   useEffect(() => { saveToStorage('scheduleSourceKey', scheduleSourceKey); }, [scheduleSourceKey]);
@@ -282,6 +304,7 @@ function AppContent() {
       basics,
       schedule,
       announcement,
+      eventTags,
       iconPrompt,
       thumbnailAssets,
       shareTexts,
@@ -295,7 +318,7 @@ function AppContent() {
     setEvents((prev) =>
       prev.map((ev) => (ev.id === activeEventId ? { ...ev, updatedAt: Date.now(), snapshot } : ev))
     );
-  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey]);
+  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey]);
 
   const goToStep = useCallback((next: AppStep) => {
     setStep(next);
@@ -330,6 +353,7 @@ function AppContent() {
     setBasics(INITIAL_BASICS);
     setSchedule([]);
     setAnnouncement('');
+    setEventTags([]);
     setIconPrompt(null);
     setThumbnailAssets(null);
     setShareTexts(null);
@@ -381,6 +405,7 @@ function AppContent() {
     setBasics(migrateBasics(s.basics));
     setSchedule(s.schedule || []);
     setAnnouncement(s.announcement || '');
+    setEventTags(s.eventTags || []);
     setIconPrompt(s.iconPrompt);
     setThumbnailAssets(s.thumbnailAssets);
     setShareTexts(s.shareTexts);
@@ -488,7 +513,7 @@ function AppContent() {
     setLoadingSourceText(`${basics.title} ${concept.purpose} ${concept.persona}`);
     setError(null);
     try {
-      const body = await generateAnnouncement(
+      const result: AnnouncementResult = await generateAnnouncement(
         apiKey,
         profile,
         concept,
@@ -498,7 +523,8 @@ function AppContent() {
         computeTimeRanges(basics.startTime, schedule),
         feedback
       );
-      setAnnouncement(body);
+      setAnnouncement(result.body);
+      setEventTags(result.tags);
       setAnnouncementSourceKey(announcementSourceFingerprint(basics, concept, schedule));
     } catch (e: any) {
       setError(e?.message || '詳細（公開情報）の生成に失敗しました。');
@@ -561,15 +587,15 @@ function AppContent() {
     setError(null);
     try {
       setShareTexts(
-        await generateShareTexts(apiKey, announcement, basics, profile.region, formatDateJa(basics.date))
+        await generateShareTexts(apiKey, announcement, basics, profile.desiredArea, formatDateJa(basics.date))
       );
-      setShareSourceKey(shareSourceFingerprint(basics, announcement, profile.region));
+      setShareSourceKey(shareSourceFingerprint(basics, announcement, profile.desiredArea));
     } catch (e: any) {
       setError(e?.message || '展開用文章の生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, announcement, basics, profile.region, ensureApiKey]);
+  }, [apiKey, announcement, basics, profile.desiredArea, ensureApiKey]);
 
   const runGenerateIdeas = useCallback(async () => {
     if (!ensureApiKey()) return;
@@ -629,6 +655,7 @@ function AppContent() {
             ideas={planIdeas}
             selectedIdeaId={selectedIdeaId}
             pinnedIds={pinnedIds}
+            plannedTheme={profile.plannedTheme}
             onSelect={setSelectedIdeaId}
             onTogglePin={togglePin}
             onRegenerate={runGenerateIdeas}
@@ -665,6 +692,7 @@ function AppContent() {
                 setBasics((prev) => ({ ...prev, titleCandidates: [], capacitySuggestion: null }));
                 setSchedule([]);
                 setAnnouncement('');
+                setEventTags([]);
                 setIconPrompt(null);
                 setThumbnailAssets(null);
                 setShareTexts(null);
@@ -674,6 +702,9 @@ function AppContent() {
                 setShareSourceKey('');
               }
               if (!activeEventId) {
+                // 新規オフ会の開始時のみ、プロフィールの開催希望をbasics.venueTypeへ反映する
+                // （既存オフ会を編集中の場合は上書きしない）
+                setBasics((prev) => ({ ...prev, venueType: profile.venuePreference }));
                 // ここで初めて「1件のオフ会」として保存枠を確保する
                 const id = crypto.randomUUID();
                 setEvents((prev) => [
@@ -687,6 +718,7 @@ function AppContent() {
                       basics,
                       schedule,
                       announcement,
+                      eventTags,
                       iconPrompt,
                       thumbnailAssets,
                       shareTexts,
@@ -782,6 +814,7 @@ function AppContent() {
         return (
           <AnnouncementStep
             announcement={announcement}
+            tags={eventTags}
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
             onNext={() => {
@@ -810,11 +843,11 @@ function AppContent() {
         return (
           <ChatSetupStep
             basics={basics}
-            offkaiChatUrl={offkaiChatUrl}
-            onChangeChatUrl={setOffkaiChatUrl}
+            announcement={announcement}
+            eventTags={eventTags}
             onNext={async () => {
               // 詳細（公開情報）を書き直した後だと、既存の展開用文章は前提が食い違っている可能性がある
-              const currentKey = shareSourceFingerprint(basics, announcement, profile.region);
+              const currentKey = shareSourceFingerprint(basics, announcement, profile.desiredArea);
               const stale = !!shareTexts && shareSourceKey !== '' && currentKey !== shareSourceKey;
               if (stale) {
                 const ok = await confirmDialog('詳細（公開情報）が変更されています。展開用の文章を作り直しますか？');
@@ -836,8 +869,9 @@ function AppContent() {
           <ShareStep
             shareTexts={shareTexts}
             basics={basics}
-            region={profile.region}
+            region={profile.desiredArea}
             offkaiChatUrl={offkaiChatUrl}
+            onChangeChatUrl={setOffkaiChatUrl}
             onGenerate={runGenerateShareTexts}
             onBack={() => setStep(AppStep.CHAT_SETUP)}
             onFinish={() => setStep(AppStep.HUB)}

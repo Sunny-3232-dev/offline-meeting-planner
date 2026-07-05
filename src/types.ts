@@ -13,7 +13,12 @@ export enum AppStep {
 export interface OrganizerProfile {
   selfIntro: string;
   interests: string;
-  region: string;
+  /** どこで開催したいか: 対面 or オンライン（必須選択） */
+  venuePreference: 'offline' | 'online';
+  /** 対面の場合の開催したいエリア（例: 関東（東京）。オンライン時は空でよい） */
+  desiredArea: string;
+  /** 既に企画が決まっている場合のテーマ（任意。入力があれば後続はこれに沿う） */
+  plannedTheme: string;
   hostingConcern: string;
 }
 
@@ -57,6 +62,10 @@ export interface EventBasics {
   venueDetail: string;
   capacity: number;
   capacitySuggestion: CapacitySuggestion | null;
+  /** オンライン時の開催ツール: 'oVice' | 'Zoom' | 'Google Meet' | 'Teams' | 'other' | '' */
+  onlineTool: string;
+  /** onlineTool === 'other' のときの自由入力 */
+  onlineToolOther: string;
 }
 
 export interface ScheduleItem {
@@ -81,6 +90,12 @@ export interface ShareTexts {
   tweet: string;
 }
 
+/** generateAnnouncement の戻り値（本文＋タグ） */
+export interface AnnouncementResult {
+  body: string;
+  tags: string[];
+}
+
 /** 作業中オフ会のスナップショット（最大4件までHubに保存） */
 export interface EventSnapshot {
   idea: PlanIdea | null;
@@ -88,6 +103,7 @@ export interface EventSnapshot {
   basics: EventBasics;
   schedule: ScheduleItem[];
   announcement: string;
+  eventTags: string[];
   iconPrompt: IconPromptResult | null;
   thumbnailAssets: ThumbnailAssets | null;
   shareTexts: ShareTexts | null;

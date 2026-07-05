@@ -11,9 +11,10 @@ import type {
   IconPromptResult,
   ThumbnailAssets,
   ShareTexts,
+  AnnouncementResult,
 } from '../types';
 
-const MODEL = 'gemini-3.5-flash';
+const MODEL = 'gemini-2.5-flash';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
 
@@ -149,8 +150,16 @@ function conceptLines(concept: IdeaConcept): string {
   ].join('\n');
 }
 
+/** オンラインツール選択に応じた開催場所ラベル（詳細文・スケジュール等の表示に使う） */
+export function venueLabelOf(basics: EventBasics): string {
+  if (basics.venueType !== 'online') return basics.venueDetail;
+  if (!basics.onlineTool) return 'オンライン';
+  const toolName = basics.onlineTool === 'other' ? basics.onlineToolOther : basics.onlineTool;
+  return toolName ? `オンライン（${toolName}）` : 'オンライン';
+}
+
 // ============================================================
-// 1. generatePlanIdeas — 企画案（王道系/ニッチ系 各10件・並列生成）
+// 1. generatePlanIdeas — 企画案（王道系/テーマ系 各10件・並列生成。テーマ指定時は5件のみ）
 //    各案にペルソナ＋軽いMVV（目的・大切にしたいこと）を内包
 // ============================================================
 const IDEA_CATEGORIES: { id: IdeaCategory; label: string; direction: string }[] = [
@@ -162,13 +171,22 @@ const IDEA_CATEGORIES: { id: IdeaCategory; label: string; direction: string }[] 
   },
   {
     id: 'niche',
-    label: 'ニッチ系',
+    label: 'テーマ系',
     direction:
-      '主催者の趣味・専門・経験を活かした、刺さる人には強く刺さる会（例: 特定テーマの勉強会・体験会、マニアックな趣味の会、特定の悩みを語る会）',
+      '主催者の趣味・専門・経験を活かした特定テーマの会。刺さる人には強く刺さる会（例: 特定テーマの勉強会・体験会、マニアックな趣味の会、特定の悩みを語る会）',
   },
 ];
 
 const IDEAS_PER_CATEGORY = 10;
+const THEME_IDEAS_COUNT = 5;
+
+/** venuePreference に応じた開催形態の前提をプロンプトに追加するための文言 */
+function venuePreferenceDirective(profile: OrganizerProfile): string {
+  if (profile.venuePreference === 'online') {
+    return '- 開催形態: オンライン開催が前提です。venueHintは必ず「オンライン」とだけ書いてください。Zoom・oVice等の具体的なツール名は絶対に書かないでください。';
+  }
+  return '- 開催形態: 対面（オフライン）開催が前提です。venueHintは対面の具体的な場所（例: 駅近カフェ、居酒屋、公園）にしてください。';
+}
 
 async function generateIdeasForCategory(
   apiKey: string,
@@ -184,7 +202,8 @@ ${category.direction}
 ## 主催者プロフィール
 - 自己紹介: ${profile.selfIntro}
 - 興味・好きなこと: ${profile.interests}
-- 住んでいる地域: ${profile.region || '未記入'}
+- 開催したいエリア: ${profile.desiredArea || '未記入'}
+${venuePreferenceDirective(profile)}
 - 初主催への不安: ${profile.hostingConcern || '特になし'}
 
 ## 各フィールドの意味
@@ -193,14 +212,14 @@ ${category.direction}
 - persona: 来てほしい人の具体像・ペルソナ（50文字以内）
 - purpose: この会の目的をひとことで（40文字以内。会の「軽いミッション」にあたるもの）
 - cherish: 会で大切にしたいこと2〜3個（各15文字以内。例:「全員が話せる」「否定しない」）
-- venueHint: 向いている開催形態（30文字以内。例: 平日朝のカフェ、オンラインZoom、駅近の居酒屋）
+- venueHint: 向いている開催形態（30文字以内）
 - recommendedCapacity: 目安の定員（主催者含む人数。初主催なら4〜8人を中心に）
 - firstTimerFriendlyPoint: 初主催でもやりやすい理由（60文字以内）
 
 ## 注意事項
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
 - 会場手配・機材・事前準備のハードルが高い企画は避けること
-- ${IDEAS_PER_CATEGORY}件はテーマ・開催形態・時間帯にバリエーションを持たせること
+- ${IDEAS_PER_CATEGORY}件はテーマ・時間帯にバリエーションを持たせること
 - 主催者の興味・得意を反映しつつ、王道系では誰でも参加しやすい定番の形を大事にすること
 - personaとpurposeは企画ごとに具体的に変えること（汎用文の使い回しをしない）
 
@@ -244,11 +263,83 @@ ${category.direction}
     }));
 }
 
+/** 主催者が既にテーマを決めている場合: そのテーマに沿った企画案を5件だけ生成 */
+async function generateThemedIdeas(apiKey: string, profile: OrganizerProfile): Promise<PlanIdea[]> {
+  const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
+主催者は既にテーマを決めています: ${profile.plannedTheme}。
+このテーマを具体化した企画案を${THEME_IDEAS_COUNT}件提案してください。
+
+## 主催者プロフィール
+- 自己紹介: ${profile.selfIntro}
+- 興味・好きなこと: ${profile.interests}
+- 開催したいエリア: ${profile.desiredArea || '未記入'}
+${venuePreferenceDirective(profile)}
+- 初主催への不安: ${profile.hostingConcern || '特になし'}
+
+## 各フィールドの意味
+- title: 企画名（30文字以内。参加者が内容をイメージできる具体的な名前）
+- summary: どんな会か（80文字以内）
+- persona: 来てほしい人の具体像・ペルソナ（50文字以内）
+- purpose: この会の目的をひとことで（40文字以内。会の「軽いミッション」にあたるもの）
+- cherish: 会で大切にしたいこと2〜3個（各15文字以内。例:「全員が話せる」「否定しない」）
+- venueHint: 向いている開催形態（30文字以内）
+- recommendedCapacity: 目安の定員（主催者含む人数。初主催なら4〜8人を中心に）
+- firstTimerFriendlyPoint: 初主催でもやりやすい理由（60文字以内）
+
+## 注意事項
+- 主催者が決めたテーマ「${profile.plannedTheme}」に必ず沿うこと（テーマを外れた提案はしない）
+- ${THEME_IDEAS_COUNT}件は切り口・時間帯・進め方にバリエーションを持たせること
+- 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
+
+## 出力形式（JSON）
+必ず有効なJSONのみを出力してください。
+
+\`\`\`json
+[
+  {
+    "title": "...",
+    "summary": "...",
+    "persona": "...",
+    "purpose": "...",
+    "cherish": ["...", "..."],
+    "venueHint": "...",
+    "recommendedCapacity": 6,
+    "firstTimerFriendlyPoint": "..."
+  }
+]
+\`\`\``;
+
+  const text = await callGemini(apiKey, prompt);
+  const parsed = extractJSON(text);
+  const list: any[] = Array.isArray(parsed) ? parsed : parsed?.ideas || [];
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error('企画案の生成結果を読み取れませんでした。再度お試しください。');
+  }
+  return list
+    .filter((i) => i && i.title)
+    .map((i) => ({
+      id: crypto.randomUUID(),
+      category: 'niche' as IdeaCategory,
+      title: String(i.title || ''),
+      summary: String(i.summary || ''),
+      persona: String(i.persona || ''),
+      purpose: String(i.purpose || ''),
+      cherish: Array.isArray(i.cherish) ? i.cherish.map(String).slice(0, 3) : [],
+      venueHint: String(i.venueHint || ''),
+      recommendedCapacity: Number(i.recommendedCapacity) || 6,
+      firstTimerFriendlyPoint: String(i.firstTimerFriendlyPoint || ''),
+    }));
+}
+
 export async function generatePlanIdeas(
   apiKey: string,
   profile: OrganizerProfile
 ): Promise<PlanIdea[]> {
-  // 王道系・ニッチ系を並列生成（片方が失敗しても全滅させない）
+  // 主催者が既にテーマを決めている場合は、そのテーマに沿った案を5件だけ生成
+  if (profile.plannedTheme && profile.plannedTheme.trim()) {
+    return generateThemedIdeas(apiKey, profile);
+  }
+  // 空の場合は従来どおり王道系・テーマ系を並列生成（片方が失敗しても全滅させない）
   const results = await Promise.allSettled(
     IDEA_CATEGORIES.map((c) => generateIdeasForCategory(apiKey, profile, c))
   );
@@ -378,7 +469,7 @@ export async function generateSchedule(
 - タイトル: ${basics.title}
 - 企画: ${idea.title}（${idea.summary}）
 - 開催形態: ${basics.venueType === 'online' ? 'オンライン' : 'オフライン（対面）'}
-- 場所: ${basics.venueDetail}
+- 場所: ${venueLabelOf(basics)}
 - 開催時間: ${basics.durationMinutes}分
 - 定員: ${basics.capacity}人（主催者含む）
 ${conceptLines(concept)}
@@ -417,8 +508,17 @@ ${conceptLines(concept)}
 }
 
 // ============================================================
-// 5. generateAnnouncement — 告知文生成
+// 5. generateAnnouncement — 告知文生成（本文＋タグ）
 // ============================================================
+const GUIDELINE_LINE_1 = '▶ オフ会ガイドラインはこちら';
+const GUIDELINE_LINE_2 = 'https://site.libecity.com/meetup-guidelines';
+
+/** 生成結果の末尾にガイドライン行が無ければ補完する（プロンプト指示への保険） */
+function ensureGuidelineFooter(body: string): string {
+  if (body.includes(GUIDELINE_LINE_2)) return body;
+  return `${body.trim()}\n\n${GUIDELINE_LINE_1}\n${GUIDELINE_LINE_2}`;
+}
+
 export async function generateAnnouncement(
   apiKey: string,
   profile: OrganizerProfile,
@@ -428,7 +528,7 @@ export async function generateAnnouncement(
   formattedDate: string,
   timeRanges: string[],
   feedback?: string
-): Promise<string> {
+): Promise<AnnouncementResult> {
   const scheduleText = schedule
     .map((s, i) => `${timeRanges[i] || ''} ${s.title}`)
     .join('\n');
@@ -438,14 +538,16 @@ export async function generateAnnouncement(
       ? `\n## 書き直しの要望（必ず反映すること・最優先で従うこと）\n${feedback.trim()}\n`
       : '';
 
+  const venueLabel = venueLabelOf(basics);
+
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
-初めてオフ会を主催する人のために、リベシティのオフ会チャット作成フォームの「詳細（公開情報）」欄に掲載する告知文を書いてください。
+初めてオフ会を主催する人のために、リベシティのオフ会チャット作成フォームの「詳細（公開情報）」欄に掲載する告知文と、チャット作成フォームに入力するタグを書いてください。
 
 ## オフ会の情報
 - タイトル: ${basics.title}
 - 日時: ${formattedDate} ${basics.startTime}〜（${basics.durationMinutes}分）
 - 開催形態: ${basics.venueType === 'online' ? 'オンライン' : 'オフライン（対面）'}
-- 場所: ${basics.venueDetail}
+- 場所: ${venueLabel}
 - 定員: ${basics.capacity}人（主催者含む）
 ${conceptLines(concept)}
 
@@ -455,26 +557,49 @@ ${scheduleText}
 ## 主催者について
 ${profile.selfIntro}
 ${feedbackSection}
-## 告知文の構成（この順で）
-1. 挨拶と自己紹介（1〜2文。初主催であることを正直に、親しみやすく）
-2. どんな会か（会の目的・大切にしたいことを自然な文章で）
-3. こんな人に来てほしい（ペルソナをやわらかい表現で）
-4. 開催概要（日時・場所・定員を見やすい箇条書きで）
-5. 当日の流れ（タイムテーブル）
-6. 参加方法・ひとこと（気軽に参加してほしい旨）
+## 告知文（body）の構成（必ずこのテンプレート構成で出力すること）
+以下の見出し（■・▶）と改行構成を必ずそのまま使い、各セクションの中身だけを埋めてください。
+
+\`\`\`
+■イベント・オフ会内容
+（会の紹介: 挨拶・自己紹介・どんな会か・こんな人に来てほしい・日時・場所・定員・当日の流れを、このセクション内に読みやすくまとめる。挨拶と自己紹介は1〜2文で初主催であることを正直に親しみやすく、どんな会かは目的・大切にしたいことを自然な文章で、こんな人に来てほしいはペルソナをやわらかい表現で、開催概要は日時・場所・定員を見やすく、当日の流れはタイムテーブルを含める）
+
+■参加費用（内訳があれば明記してください）
+（${basics.venueType === 'offline' ? '対面なら「実費（カフェ代等は各自ご負担）」のような想定を書き、主催者が編集しやすい形にすること' : 'オンラインなら「無料」等、実態に即した内容にすること'}）
+
+■参加方法
+参加希望の方は、こちらのチャットに参加申請をお願いします。
+
+■募集期限
+（開催日「${formattedDate}」から逆算した妥当な募集期限を提案する。例: ◯月◯日（◯）まで）
+
+■注意事項
+（キャンセル連絡・遅刻連絡など、初主催でも書きやすい定番の注意事項を1〜3行）
+
+▶ オフ会ガイドラインはこちら
+https://site.libecity.com/meetup-guidelines
+\`\`\`
+
+- 「■参加方法」の本文2行目（「参加希望の方は、こちらのチャットに参加申請をお願いします。」）と、末尾の「▶ オフ会ガイドラインはこちら」「https://site.libecity.com/meetup-guidelines」の2行は、一字一句この通りに出力すること（絶対に変えない）
+- 各見出し（■参加費用 等）はそのまま残し、中身だけを埋めること
 
 ## 注意事項
-- 全体で600〜900文字程度
+- ■イベント・オフ会内容セクションは全体で600〜900文字程度
 - 絵文字を適度に使い、堅くなりすぎないこと
 - 「初めての方も大歓迎」の空気を作ること
-- 見出しや区切り線を使って読みやすくすること
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください。
 
+## タグ（tags）
+リベシティのオフ会チャット作成フォームに入力する、この会に合ったタグを5個前後考えてください。
+- 例: オフ会 / 交流 / 初心者大歓迎 / 朝活 / もくもく会
+- 「#」記号は付けないこと
+- この会の内容・雰囲気に合った具体的なタグにすること
+
 ## 出力形式（JSON）
-必ず有効なJSONのみを出力してください。bodyに告知文全体を入れること。
+必ず有効なJSONのみを出力してください。bodyに告知文全体、tagsにタグの配列を入れること。
 
 \`\`\`json
-{ "body": "..." }
+{ "body": "...", "tags": ["...", "...", "...", "...", "..."] }
 \`\`\``;
 
   const text = await callGemini(apiKey, prompt);
@@ -483,7 +608,13 @@ ${feedbackSection}
   if (!body) {
     throw new Error('告知文の生成結果を読み取れませんでした。再度お試しください。');
   }
-  return body;
+  const tags: string[] = Array.isArray(parsed?.tags)
+    ? parsed.tags.map(String).filter(Boolean).slice(0, 8)
+    : [];
+  return {
+    body: ensureGuidelineFooter(body),
+    tags,
+  };
 }
 
 // ============================================================
@@ -557,7 +688,7 @@ export async function generateThumbnailAssets(
   basics: EventBasics,
   formattedDate: string
 ): Promise<ThumbnailAssets> {
-  const venueLabel = basics.venueType === 'online' ? 'オンライン' : basics.venueDetail;
+  const venueLabel = venueLabelOf(basics);
   // 日付計算はAIに任せず、コード側で確定した文字列をそのまま画像に焼き込ませる
   const dateTimeText = `${formattedDate} ${basics.startTime}〜`;
   const placeText = venueLabel;

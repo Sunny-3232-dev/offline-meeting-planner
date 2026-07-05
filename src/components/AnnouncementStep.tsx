@@ -3,6 +3,7 @@ import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CopyIcon, CheckIcon } fro
 
 interface AnnouncementStepProps {
   announcement: string;
+  tags: string[];
   onChange: (text: string) => void;
   /** feedbackが空文字の場合は初回生成（同条件での再生成）、それ以外は要望を反映して書き直す */
   onRegenerate: (feedback: string) => void;
@@ -12,6 +13,7 @@ interface AnnouncementStepProps {
 
 export default function AnnouncementStep({
   announcement,
+  tags,
   onChange,
   onRegenerate,
   onNext,
@@ -19,6 +21,7 @@ export default function AnnouncementStep({
 }: AnnouncementStepProps) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [tagsCopied, setTagsCopied] = useState(false);
 
   const handleCopy = async () => {
     try {
@@ -27,6 +30,16 @@ export default function AnnouncementStep({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // クリップボード不可の環境では選択を促す
+    }
+  };
+
+  const handleCopyTags = async () => {
+    try {
+      await navigator.clipboard.writeText(tags.join(' '));
+      setTagsCopied(true);
+      setTimeout(() => setTagsCopied(false), 2000);
+    } catch {
+      // noop
     }
   };
 
@@ -64,6 +77,33 @@ export default function AnnouncementStep({
             </button>
           </div>
           <p className="text-xs text-slate-400 mb-4">{announcement.length}文字</p>
+
+          {tags.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold text-slate-700">適切なタグ</h3>
+                <button
+                  onClick={handleCopyTags}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    tagsCopied ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {tagsCopied ? <CheckIcon size={13} /> : <CopyIcon size={13} />}
+                  {tagsCopied ? 'コピーしました' : 'タグをコピー'}
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map((tag, i) => (
+                  <span
+                    key={i}
+                    className="px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-medium"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-8">
             <label htmlFor="announcementFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
@@ -105,9 +145,6 @@ export default function AnnouncementStep({
                 <RefreshIcon size={13} />
                 この内容で書き直す
               </button>
-              <p className="text-[11px] text-amber-600">
-                ⚠️ リベシティは太字やリスト等のMarkdownに非対応のため、プレーンテキストで出力しています。
-              </p>
             </div>
           </div>
         </>

@@ -12,8 +12,6 @@ interface ScheduleStepProps {
   onBack: () => void;
 }
 
-const DURATION_CHOICES = [5, 10, 15, 20, 25, 30, 40, 45, 60, 90];
-
 function newItem(): ScheduleItem {
   return { id: crypto.randomUUID(), title: '', description: '', durationMinutes: 10 };
 }
@@ -78,32 +76,17 @@ export default function ScheduleStep({
                     {ranges[idx]}
                   </span>
                   <div className="flex items-center gap-1">
-                    <select
-                      value={DURATION_CHOICES.includes(item.durationMinutes) ? item.durationMinutes : 'custom'}
-                      onChange={(e) => {
-                        if (e.target.value !== 'custom') {
-                          update(item.id, { durationMinutes: Number(e.target.value) });
-                        }
-                      }}
-                      aria-label="所要時間"
-                      className="text-xs border border-slate-200 rounded-lg px-1.5 py-1 bg-slate-50"
-                    >
-                      {DURATION_CHOICES.map((d) => (
-                        <option key={d} value={d}>{d}分</option>
-                      ))}
-                      {!DURATION_CHOICES.includes(item.durationMinutes) && (
-                        <option value="custom">{item.durationMinutes}分</option>
-                      )}
-                    </select>
                     <input
                       type="number"
                       min={1}
                       max={180}
+                      step={5}
                       value={item.durationMinutes}
                       onChange={(e) => update(item.id, { durationMinutes: Math.max(1, Number(e.target.value) || 1) })}
-                      aria-label="所要時間（分・直接入力）"
-                      className="w-14 text-xs border border-slate-200 rounded-lg px-1.5 py-1 bg-slate-50 tabular-nums"
+                      aria-label="所要時間（分）"
+                      className="w-20 text-xs border border-slate-200 rounded-lg px-1.5 py-1 bg-slate-50 tabular-nums"
                     />
+                    <span className="text-xs text-slate-500">分</span>
                   </div>
                 </div>
 
