@@ -143,9 +143,34 @@ export default function ChatSetupStep({
           <SendIcon size={15} />
           リベシティでオフ会チャットを作成する
         </a>
-        <p className="mt-3 text-xs text-sky-600/70">
-          Chromeの画面2分割機能を使い、左に「オフ会プランナー」、右にリベシティのチャット作成フォームを並べると、左から右へコピー＆ペーストでスムーズに転記できます。
-        </p>
+        <div className="mt-3 text-xs text-sky-600/70">
+          <p>
+            画面を左右に2分割し、左に「オフ会プランナー」、右にリベシティのチャット作成フォームを並べると、左から右へコピー＆ペーストでスムーズに転記できます。
+          </p>
+          <details className="mt-2">
+            <summary className="cursor-pointer font-semibold text-sky-700 hover:text-sky-800">
+              画面2分割のやり方を見る
+            </summary>
+            <div className="mt-2 space-y-2 text-sky-700/80">
+              <div>
+                <p className="font-semibold text-sky-700">Mac の場合</p>
+                <ol className="mt-0.5 list-decimal list-inside space-y-0.5">
+                  <li>リベシティのフォームを別ウィンドウにする（タブをウィンドウの外へドラッグすると別ウィンドウになります）</li>
+                  <li>「オフ会プランナー」のウィンドウを、タイトルバーをつかんで画面の左端までドラッグ → 左半分にピタッと収まります（緑ボタンにカーソルを合わせて「画面左側にタイル表示」でもOK）</li>
+                  <li>リベシティのウィンドウは同じく右端までドラッグ → 右半分に配置</li>
+                </ol>
+              </div>
+              <div>
+                <p className="font-semibold text-sky-700">Windows の場合</p>
+                <ol className="mt-0.5 list-decimal list-inside space-y-0.5">
+                  <li>リベシティのフォームを別ウィンドウにする（タブを外へドラッグ）</li>
+                  <li>「オフ会プランナー」のウィンドウを選び <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">⊞ Win</kbd> ＋ <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">←</kbd> で左半分に</li>
+                  <li>リベシティのウィンドウは <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">⊞ Win</kbd> ＋ <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">→</kbd> で右半分に（画面端までドラッグでも可）</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+        </div>
       </div>
 
       <div className="space-y-3 mb-8">
