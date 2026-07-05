@@ -152,22 +152,14 @@ export default function ChatSetupStep({
               画面2分割のやり方を見る
             </summary>
             <div className="mt-2 space-y-2 text-sky-700/80">
-              <div>
-                <p className="font-semibold text-sky-700">Mac の場合</p>
-                <ol className="mt-0.5 list-decimal list-inside space-y-0.5">
-                  <li>リベシティのフォームを別ウィンドウにする（タブをウィンドウの外へドラッグすると別ウィンドウになります）</li>
-                  <li>「オフ会プランナー」のウィンドウを、タイトルバーをつかんで画面の左端までドラッグ → 左半分にピタッと収まります（緑ボタンにカーソルを合わせて「画面左側にタイル表示」でもOK）</li>
-                  <li>リベシティのウィンドウは同じく右端までドラッグ → 右半分に配置</li>
-                </ol>
-              </div>
-              <div>
-                <p className="font-semibold text-sky-700">Windows の場合</p>
-                <ol className="mt-0.5 list-decimal list-inside space-y-0.5">
-                  <li>リベシティのフォームを別ウィンドウにする（タブを外へドラッグ）</li>
-                  <li>「オフ会プランナー」のウィンドウを選び <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">⊞ Win</kbd> ＋ <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">←</kbd> で左半分に</li>
-                  <li>リベシティのウィンドウは <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">⊞ Win</kbd> ＋ <kbd className="px-1 py-0.5 rounded bg-white border border-sky-200 text-[10px] font-mono">→</kbd> で右半分に（画面端までドラッグでも可）</li>
-                </ol>
-              </div>
+              <ol className="list-decimal list-inside space-y-0.5">
+                <li>上の「リベシティでオフ会チャットを作成する」ボタンを<b>右クリック</b>します。</li>
+                <li>出てきたメニューから<b>「分割画面で開く」</b>（ブラウザの画面分割）を選びます。</li>
+                <li>すると画面の右側にリベシティのチャット作成フォームが並び、左に「オフ会プランナー」が残ります。左から右へそのままコピー＆ペーストで転記できます。</li>
+              </ol>
+              <p className="text-[11px]">
+                ※右クリックメニューに分割の項目が出ないブラウザの場合は、同じく右クリック →「リンクを新しいウィンドウで開く」で別ウィンドウにし、2つのウィンドウを画面の左右の端までドラッグすると横並びにできます。
+              </p>
             </div>
           </details>
         </div>
