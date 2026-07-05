@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { EventBasics } from '../types';
-import { LIBECITY_EVENT_CREATE_URL } from '../constants';
+import { LIBECITY_EVENT_CREATE_URL, officeLabel } from '../constants';
+import { formatEventDateJa } from '../utils/time';
 import { ArrowRightIcon, ChevronLeftIcon, SendIcon, CopyIcon, CheckIcon } from './icons';
 
 interface ChatSetupStepProps {
@@ -117,6 +118,10 @@ export default function ChatSetupStep({
   const isOfficialOffice = !!basics.officeKey;
   const isOnline = basics.venueType === 'online';
 
+  const placeLabel = basics.officeKey ? officeLabel(basics.officeKey) : basics.venueDetail.trim();
+  const datePart = formatEventDateJa(basics.date);
+  const roomName = [datePart, basics.title].filter(Boolean).join(' ') + (placeLabel ? `＠${placeLabel}` : '');
+
   return (
     <div className="max-w-2xl mx-auto py-8 animate-fade-in">
       <h2 className="text-2xl font-bold text-slate-800 mb-2">オフ会チャットを立ち上げましょう</h2>
@@ -144,7 +149,7 @@ export default function ChatSetupStep({
       </div>
 
       <div className="space-y-3 mb-8">
-        <CopyField label="オフ会チャットルーム名" value={basics.title} />
+        <CopyField label="オフ会チャットルーム名" value={roomName} />
         <CopyField label="定員" value={`${basics.capacity}`} hideCopyButton />
         <TagsField tags={eventTags} />
         <CopyField label="詳細（公開）情報" value={announcement} longText />

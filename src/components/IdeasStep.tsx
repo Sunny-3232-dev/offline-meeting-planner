@@ -61,7 +61,7 @@ const CATEGORY_META: Record<IdeaCategory, { label: string; Icon: React.Component
   other: {
     label: 'その他',
     Icon: GroupIcon,
-    desc: '雑談・交流など気軽に集まる会',
+    desc: 'お金の5つに属さない、雑談・交流など気軽に集まる会',
     bg: 'bg-slate-50',
     border: 'border-slate-200',
     accent: 'text-slate-600',
@@ -192,7 +192,7 @@ export default function IdeasStep({
       <p className="text-sm text-slate-500 mb-1">
         {plannedTheme && plannedTheme.trim()
           ? `テーマ「${plannedTheme}」に沿った企画案を提案しました。`
-          : 'あなたのプロフィールをもとに、お金の6テーマ（貯める・稼ぐ・守る・増やす・使う・その他）で企画案を提案しました。'}
+          : 'あなたのプロフィールをもとに、お金の5つのテーマ（貯める・稼ぐ・守る・増やす・使う）と、その他の会を提案しました。'}
       </p>
       <p className="text-xs text-slate-400 mb-6">
         気になった案は灯マークでピン留め（最大{MAX_PINNED_IDEAS}件・「別の案を出す」でも消えません）／ カードを<b>ダブルクリック</b>するとその企画に決めて次へ進みます

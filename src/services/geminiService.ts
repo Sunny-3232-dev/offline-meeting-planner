@@ -170,7 +170,7 @@ export function venueLabelOf(basics: EventBasics): string {
 }
 
 // ============================================================
-// 1. generatePlanIdeas — 企画案（お金の6テーマ 各4件・並列生成。テーマ指定時は5件のみ）
+// 1. generatePlanIdeas — 企画案（お金の5テーマ＋その他 各4件・並列生成。テーマ指定時は5件のみ）
 //    各案にペルソナ＋軽いMVV（目的・大切にしたいこと）を内包
 // ============================================================
 const IDEA_CATEGORIES: { id: IdeaCategory; label: string; direction: string }[] = [

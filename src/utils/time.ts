@@ -35,6 +35,15 @@ export function formatDateJa(dateStr: string): string {
   return `${y}年${m}月${d}日(${youbi})`;
 }
 
+const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
+/** 'YYYY-MM-DD' → 'M/D(曜)'。空や不正な日付は '' を返す */
+export function formatEventDateJa(dateStr: string): string {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAYS_JA[d.getDay()]})`;
+}
+
 const TIMETABLE_HEADING = '■当日の流れ';
 const NEXT_SECTION_MARK_RE = /^[■▶]/;
 

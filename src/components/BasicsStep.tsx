@@ -1,12 +1,24 @@
 import React from 'react';
 import { EventBasics, PlanIdea } from '../types';
-import { DURATION_OPTIONS, OFFICIAL_OFFICES, officeLabel } from '../constants';
+import { DURATION_OPTIONS, OFFICIAL_OFFICES, officeLabel, PREFECTURES } from '../constants';
 import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon } from './icons';
 
-const ONLINE_TOOLS = ['oVice', 'Zoom', 'Google Meet', 'Teams', 'other'] as const;
+const ONLINE_PLACE_OPTIONS = ['oVice', 'その他オンライン'] as const;
 
-function onlineToolLabel(tool: string): string {
-  return tool === 'other' ? 'その他' : tool;
+/** 通常モードの開催場所プルダウン値から venueType を導出する */
+function deriveVenueType(onlineTool: string): 'online' | 'offline' {
+  return onlineTool === 'oVice' || onlineTool === 'その他オンライン' ? 'online' : 'offline';
+}
+
+/** 通常モードの venueDetail 合成ルール */
+function composeNormalVenueDetail(onlineTool: string, onlineToolOther: string): string {
+  if (!onlineTool) return '';
+  const other = onlineToolOther.trim();
+  if (deriveVenueType(onlineTool) === 'online') {
+    return other ? `${onlineTool}（${other}）` : onlineTool;
+  }
+  // 都道府県
+  return other ? `${onlineTool} ${other}` : onlineTool;
 }
 
 interface BasicsStepProps {
@@ -139,130 +151,115 @@ export default function BasicsStep({
           <span className="block text-sm font-semibold text-slate-700 mb-1.5">
             場所 <span className="text-red-500 text-xs">必須</span>
           </span>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-4 py-2 rounded-full text-sm font-medium bg-sky-600 text-white">
-              開催形態： {basics.venueType === 'offline' ? 'オフライン（対面）' : 'オンライン'}
-            </span>
-            <span className="text-xs text-slate-400">（プロフィールで選択）</span>
+
+          {/* 種類選択: 公式オフィス / 通常のオフ会・イベント */}
+          <div className="flex flex-wrap gap-2 mb-2" role="radiogroup" aria-label="開催形態の種類">
+            {([
+              { official: true, label: '公式オフィスで開催するイベント' },
+              { official: false, label: '通常のオフ会・イベント' },
+            ]).map((v) => {
+              const checked = v.official ? !!basics.officeKey : !basics.officeKey;
+              return (
+                <button
+                  key={String(v.official)}
+                  type="button"
+                  role="radio"
+                  aria-checked={checked}
+                  onClick={() => {
+                    if (v.official) {
+                      // 公式オフィスを選んだら先頭のオフィスを仮選択し、場所欄も連動
+                      const first = basics.officeKey || OFFICIAL_OFFICES[0].key;
+                      set({
+                        officeKey: first,
+                        venueType: 'offline',
+                        venueDetail: `リベシティ ${officeLabel(first)}`,
+                        onlineTool: '',
+                        onlineToolOther: '',
+                      });
+                    } else {
+                      set({ officeKey: '', onlineTool: '', onlineToolOther: '', venueDetail: '' });
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    checked
+                      ? 'bg-sky-600 text-white'
+                      : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* オフライン時: 公式オフィスかどうか */}
-          {basics.venueType === 'offline' && (
+          {/* 公式オフィスで開催するイベント */}
+          {!!basics.officeKey && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">
-              <div className="flex gap-2 mb-2" role="radiogroup" aria-label="会場の種類">
-                {([
-                  { official: true, label: 'リベシティ公式オフィス' },
-                  { official: false, label: 'その他の場所（カフェ・居酒屋など）' },
-                ]).map((v) => {
-                  const checked = v.official ? !!basics.officeKey : !basics.officeKey;
-                  return (
-                    <button
-                      key={String(v.official)}
-                      type="button"
-                      role="radio"
-                      aria-checked={checked}
-                      onClick={() => {
-                        if (v.official) {
-                          // 公式オフィスを選んだら先頭のオフィスを仮選択し、場所欄も連動
-                          const first = basics.officeKey || OFFICIAL_OFFICES[0].key;
-                          set({ officeKey: first, venueDetail: `リベシティ ${officeLabel(first)}` });
-                        } else {
-                          set({ officeKey: '', venueDetail: '' });
-                        }
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        checked
-                          ? 'bg-sky-600 text-white'
-                          : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {v.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {basics.officeKey && (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5" role="radiogroup" aria-label="オフィスを選択">
-                    {OFFICIAL_OFFICES.map((o) => (
-                      <button
-                        key={o.key}
-                        type="button"
-                        role="radio"
-                        aria-checked={basics.officeKey === o.key}
-                        onClick={() => set({ officeKey: o.key, venueDetail: `リベシティ ${o.label}` })}
-                        className={`px-2 py-1.5 rounded-lg text-xs text-left transition-colors ${
-                          basics.officeKey === o.key
-                            ? 'bg-sky-600 text-white'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-sky-50'
-                        }`}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-[11px] text-amber-700 flex items-start gap-1">
-                    <AlertIcon size={13} className="shrink-0 mt-0.5" />
-                    <span>公式オフィス開催は、チャット作成前に必ず<b>オフィスの予約</b>をお取りください（リベシティのオフ会作成フォームにも同じ注意があります）</span>
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* オンライン時: 開催ツール選択 */}
-          {basics.venueType === 'online' && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2">
-              <div className="flex flex-wrap gap-2 mb-2" role="radiogroup" aria-label="開催ツール">
-                {ONLINE_TOOLS.map((tool) => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5" role="radiogroup" aria-label="オフィスを選択">
+                {OFFICIAL_OFFICES.map((o) => (
                   <button
-                    key={tool}
+                    key={o.key}
                     type="button"
                     role="radio"
-                    aria-checked={basics.onlineTool === tool}
-                    onClick={() =>
-                      set({
-                        onlineTool: tool,
-                        venueDetail: tool === 'other' ? basics.onlineToolOther : tool,
-                      })
-                    }
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      basics.onlineTool === tool
+                    aria-checked={basics.officeKey === o.key}
+                    onClick={() => set({ officeKey: o.key, venueDetail: `リベシティ ${o.label}` })}
+                    className={`px-2 py-1.5 rounded-lg text-xs text-left transition-colors ${
+                      basics.officeKey === o.key
                         ? 'bg-sky-600 text-white'
-                        : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-100'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-sky-50'
                     }`}
                   >
-                    {onlineToolLabel(tool)}
+                    {o.label}
                   </button>
                 ))}
               </div>
-              {basics.onlineTool === 'other' && (
-                <input
-                  type="text"
-                  value={basics.onlineToolOther}
-                  onChange={(e) => set({ onlineToolOther: e.target.value, venueDetail: e.target.value })}
-                  placeholder="例: Discord"
-                  aria-label="その他の開催ツール"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-                />
-              )}
+              <p className="mt-2 text-[11px] text-amber-700 flex items-start gap-1">
+                <AlertIcon size={13} className="shrink-0 mt-0.5" />
+                <span>公式オフィス開催は、チャット作成前に必ず<b>オフィスの予約</b>をお取りください（リベシティのオフ会作成フォームにも同じ注意があります）</span>
+              </p>
             </div>
           )}
 
-          {basics.venueType !== 'online' && (
-            <input
-              type="text"
-              value={basics.venueDetail}
-              onChange={(e) => set({ venueDetail: e.target.value })}
-              aria-label="場所の詳細"
-              placeholder={
-                basics.officeKey
-                  ? 'オフィスを選ぶと自動入力されます'
-                  : '例: 東京駅周辺のカフェ（お店は人数確定後に予約）'
-              }
-              className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-            />
+          {/* 通常のオフ会・イベント */}
+          {!basics.officeKey && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-2 space-y-2">
+              <select
+                value={basics.onlineTool}
+                aria-label="開催場所"
+                onChange={(e) => {
+                  const tool = e.target.value;
+                  const venueType = tool ? deriveVenueType(tool) : basics.venueType;
+                  set({
+                    onlineTool: tool,
+                    venueType,
+                    venueDetail: composeNormalVenueDetail(tool, basics.onlineToolOther),
+                  });
+                }}
+                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+              >
+                <option value="">選択してください</option>
+                {ONLINE_PLACE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                {PREFECTURES.map((pref) => (
+                  <option key={pref} value={pref}>{pref}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={basics.onlineToolOther}
+                onChange={(e) => {
+                  const other = e.target.value;
+                  set({
+                    onlineToolOther: other,
+                    venueDetail: composeNormalVenueDetail(basics.onlineTool, other),
+                  });
+                }}
+                placeholder="例：市区町村・施設名"
+                aria-label="開催場所の詳細"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+              />
+            </div>
           )}
         </section>
 
@@ -281,19 +278,6 @@ export default function BasicsStep({
               >
                 −
               </button>
-              <span className="w-16 text-center text-sm font-bold text-slate-800" aria-live="polite">
-                {basics.capacity}人
-              </span>
-              <button
-                type="button"
-                onClick={() => set({ capacity: Math.min(50, basics.capacity + 1) })}
-                className="px-4 py-2.5 text-slate-500 hover:bg-slate-50 text-lg font-bold"
-                aria-label="定員を増やす"
-              >
-                ＋
-              </button>
-            </div>
-            <div className="flex items-center gap-1.5">
               <input
                 type="number"
                 min={2}
@@ -305,10 +289,18 @@ export default function BasicsStep({
                   set({ capacity: Math.min(50, Math.max(2, v)) });
                 }}
                 aria-label="定員を数値で入力"
-                className="w-20 px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white tabular-nums"
+                className="w-16 text-center text-sm font-bold text-slate-800 tabular-nums focus:outline-none"
               />
-              <span className="text-xs text-slate-500">人（直接入力）</span>
+              <button
+                type="button"
+                onClick={() => set({ capacity: Math.min(50, basics.capacity + 1) })}
+                className="px-4 py-2.5 text-slate-500 hover:bg-slate-50 text-lg font-bold"
+                aria-label="定員を増やす"
+              >
+                ＋
+              </button>
             </div>
+            <span className="text-xs text-slate-500">人</span>
             <button
               type="button"
               onClick={onSuggestCapacity}

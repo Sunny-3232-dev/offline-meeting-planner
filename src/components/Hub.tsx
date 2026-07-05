@@ -19,7 +19,7 @@ interface HubProps {
 
 const FLOW = [
   { Icon: UserIcon, title: 'プロフィール', desc: 'あなたの興味と開催したい場所を入力' },
-  { Icon: LightbulbIcon, title: '企画案', desc: 'お金の6テーマ（貯める/稼ぐ/守る/増やす/使う/他）で提案。ピン留めして選べる' },
+  { Icon: LightbulbIcon, title: '企画案', desc: 'お金の5つのテーマ（貯める/稼ぐ/守る/増やす/使う）＋その他で提案。ピン留めして選べる' },
   { Icon: CalendarIcon, title: '基本情報', desc: 'タイトル・日時・場所・定員' },
   { Icon: ClockIcon, title: '進行イメージ', desc: '当日の大まかな流れ' },
   { Icon: FileTextIcon, title: '詳細情報', desc: 'そのまま貼れる公開情報の文章' },
