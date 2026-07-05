@@ -9,7 +9,7 @@ interface ProfileInputProps {
 }
 
 export default function ProfileInput({ profile, onChange, onNext }: ProfileInputProps) {
-  const canProceed = profile.selfIntro.trim().length >= 10 && profile.interests.trim().length >= 2;
+  const canProceed = profile.selfIntro.trim().length >= 10;
 
   const set = (patch: Partial<OrganizerProfile>) => onChange({ ...profile, ...patch });
 
@@ -53,7 +53,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
 
         <div>
           <label htmlFor="interests" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            興味・好きなこと <span className="text-red-500 text-xs">必須</span>
+            興味・好きなこと <span className="text-slate-400 text-xs">任意</span>
           </label>
           <textarea
             id="interests"
