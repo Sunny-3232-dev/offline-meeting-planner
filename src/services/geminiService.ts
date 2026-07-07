@@ -9,6 +9,7 @@ import type {
   EventBasics,
   ScheduleItem,
   IconPromptResult,
+  IconStyleCandidate,
   ThumbnailAssets,
   ShareTexts,
   AnnouncementResult,
@@ -215,12 +216,13 @@ const IDEA_CATEGORIES: { id: IdeaCategory; label: string; direction: string }[] 
 const IDEAS_PER_CATEGORY = 4;
 const THEME_IDEAS_COUNT = 5;
 
-/** venuePreference に応じた開催形態の前提をプロンプトに追加するための文言 */
+/** venuePreference に応じた開催形態の前提をプロンプトに追加するための文言。
+ * 具体的な場所の提案はしない（場所は基本情報ステップで主催者が決める） */
 function venuePreferenceDirective(profile: OrganizerProfile): string {
   if (profile.venuePreference === 'online') {
-    return '- 開催形態: オンライン開催が前提です。venueHintは必ず「オンライン」とだけ書いてください。Zoom・oVice等の具体的なツール名は絶対に書かないでください。';
+    return '- 開催形態: 主催者はオンライン開催を選んでいます。全案を必ずオンライン前提の企画にすること。実際に集まる前提の要素（飲食店・会場・現地集合など）を入れないこと。';
   }
-  return '- 開催形態: 対面（オフライン）開催が前提です。venueHintは対面の具体的な場所（例: 駅近カフェ、居酒屋、公園）にしてください。';
+  return '- 開催形態: 主催者は対面（オフライン）開催を選んでいます。全案を必ず実際に集まって行う企画にすること。title・summary・進め方に「オンライン」という語やオンライン開催前提の内容を絶対に入れないこと。';
 }
 
 async function generateIdeasForCategory(
@@ -247,7 +249,6 @@ ${venuePreferenceDirective(profile)}
 - persona: 来てほしい人の具体像・ペルソナ（50文字以内）
 - purpose: この会の目的をひとことで（40文字以内。会の「軽いミッション」にあたるもの）
 - cherish: 会で大切にしたいこと2〜3個（各15文字以内。例:「全員が話せる」「否定しない」）
-- venueHint: 向いている開催形態（30文字以内）
 - recommendedCapacity: 目安の定員（主催者含む人数。初主催なら4〜8人を中心に）
 - firstTimerFriendlyPoint: 初主催でもやりやすい理由（60文字以内）
 
@@ -270,7 +271,6 @@ ${venuePreferenceDirective(profile)}
     "persona": "...",
     "purpose": "...",
     "cherish": ["...", "..."],
-    "venueHint": "...",
     "recommendedCapacity": 6,
     "firstTimerFriendlyPoint": "..."
   }
@@ -302,8 +302,8 @@ ${venuePreferenceDirective(profile)}
 /** 主催者が既にテーマを決めている場合: そのテーマに沿った企画案を5件だけ生成 */
 async function generateThemedIdeas(apiKey: string, profile: OrganizerProfile): Promise<PlanIdea[]> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
-主催者は既にテーマを決めています: ${profile.plannedTheme}。
-このテーマを具体化した企画案を${THEME_IDEAS_COUNT}件提案してください。
+主催者は既にテーマを決めています: 「${profile.plannedTheme}」。
+このテーマ・この表現に忠実な企画案を${THEME_IDEAS_COUNT}件提案してください。あなたの仕事はテーマを考えることではなく、主催者が決めたテーマを開催可能な形に具体化することだけです。
 
 ## 主催者プロフィール
 - 自己紹介: ${profile.selfIntro}
@@ -318,15 +318,16 @@ ${venuePreferenceDirective(profile)}
 - persona: 来てほしい人の具体像・ペルソナ（50文字以内）
 - purpose: この会の目的をひとことで（40文字以内。会の「軽いミッション」にあたるもの）
 - cherish: 会で大切にしたいこと2〜3個（各15文字以内。例:「全員が話せる」「否定しない」）
-- venueHint: 向いている開催形態（30文字以内）
 - recommendedCapacity: 目安の定員（主催者含む人数。初主催なら4〜8人を中心に）
 - firstTimerFriendlyPoint: 初主催でもやりやすい理由（60文字以内）
 
-## 注意事項
-- 主催者が決めたテーマ「${profile.plannedTheme}」に必ず沿うこと（テーマを外れた提案はしない）
-- 主催者が入力したテーマ「${profile.plannedTheme}」を勝手に別テーマへ拡大解釈せず、その内容に忠実に具体化すること。テーマ名の言い換え・置き換えは最小限にすること
-- ${THEME_IDEAS_COUNT}件は切り口・時間帯・進め方にバリエーションを持たせること
+## 注意事項（テーマへの忠実性が最優先）
+- ${THEME_IDEAS_COUNT}件すべてが、主催者の決めたテーマ「${profile.plannedTheme}」の企画であること。テーマを外れた案・別ジャンルの案は1件も混ぜないこと
+- titleには原則、主催者が書いたテーマの言葉（キーワード）を**一字一句正確にコピーして**含めること。文字の脱落・変更は厳禁（例:「スキルマ」を「スキマ」と書かない）。別の言葉への言い換え・置き換えも禁止（例: テーマが「ボドゲ会」なら「ボドゲ」をタイトルに残す。「テーブルゲーム交流会」等に言い換えない）
+- summary・purposeでも主催者の表現・ニュアンスを尊重し、勝手に上位概念・別テーマへ拡大解釈しないこと
+- ${THEME_IDEAS_COUNT}件の違いは「切り口・進め方・時間帯・対象の絞り方」だけで出すこと。テーマそのものは変えないこと
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
+- プロフィールの興味・自己紹介はあくまで補足情報。テーマとの優先順位で迷ったら必ずテーマを優先すること
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。
@@ -339,7 +340,6 @@ ${venuePreferenceDirective(profile)}
     "persona": "...",
     "purpose": "...",
     "cherish": ["...", "..."],
-    "venueHint": "...",
     "recommendedCapacity": 6,
     "firstTimerFriendlyPoint": "..."
   }
@@ -513,6 +513,7 @@ ${conceptLines(concept)}
 
 ## 進行イメージの条件
 - 各項目は {title, description, durationMinutes} で構成
+- durationMinutesは10分単位（10, 20, 30...）にすること
 - **durationMinutesの合計が必ず${basics.durationMinutes}分ちょうどになること**
 - 冒頭にオープニング（挨拶・趣旨説明）、終盤にクロージング（まとめ・次回予告・解散）を入れること
 - 定員${basics.capacity}人が全員話せるよう、自己紹介の時間は1人あたり1〜2分で計算すること
@@ -593,6 +594,7 @@ ${historyText}
 ## 調整方針（重要）
 - 主催者が既に削除した項目を勝手に復活させないこと。主催者が並べ替えた順序はできるだけ尊重すること
 - ゼロから新しい進行を作るのではなく、現在の構成に要望を反映する形で調整すること（項目の追加・修正・時間配分の見直しは要望に応じて行ってよい）
+- durationMinutesは10分単位（10, 20, 30...）にすること
 - **durationMinutesの合計が必ず${basics.durationMinutes}分ちょうどになること**
 - 各項目は {title, description, durationMinutes} で構成
 - descriptionには主催者向けの進行のコツを書くこと（50文字以内）
@@ -689,6 +691,8 @@ https://site.libecity.com/meetup-guidelines
 
 ## 注意事項
 - ■イベント・オフ会内容セクションは全体で500〜800文字程度
+- 一文は短く（目安40文字以内）。長くなりそうな文は2つに分けること
+- 文のまとまりごとに改行し、話題の変わり目には空行を入れて、スマホでも読みやすくすること
 - 絵文字を適度に使い、堅くなりすぎないこと
 - 「初めての方も大歓迎」の空気を作ること
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください。
@@ -760,6 +764,7 @@ ${organizerNameDirective(profile.organizerName)}
 - 現在の詳細文の内容・情報（日時・場所・定員など具体的な事実）を勝手に変えないこと。要望に関係ない部分はできるだけ元の文章を活かすこと
 - テンプレート構成（■イベント・オフ会内容 / ■参加費用 / ■参加方法 / ■募集期限 / ■注意事項 / ▶ オフ会ガイドラインはこちら）は必ずそのまま維持すること。見出しを増減・変更しないこと
 - 「■当日の流れ」セクションが残っている場合は丸ごと削除すること（当日の流れは主催者だけが見る別ページで管理し、公開情報には載せない方針になりました）
+- 一文は短く（目安40文字以内）。長い文は分割し、文のまとまりごとに改行・話題の変わり目には空行を入れて、スマホでも読みやすくすること
 - 「■参加方法」の本文2行目（「参加希望の方は、こちらのチャットに参加申請をお願いします。」）と、末尾の「▶ オフ会ガイドラインはこちら」「https://site.libecity.com/meetup-guidelines」の2行は、一字一句そのまま維持すること（絶対に変えない）
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください
 
@@ -790,17 +795,44 @@ ${organizerNameDirective(profile.organizerName)}
 }
 
 // ============================================================
-// 6. generateIconPrompt — 円形オフ会アイコン用プロンプト
-//    AIにはキーワードだけを考えさせ、プロンプト文の組み立てはコード側で行う
+// 6. generateIconPrompt — 円形オフ会アイコン用プロンプト（3スタイル候補）
+//    AIには素材（ワード・モチーフ・絵文字）だけを考えさせ、
+//    プロンプト文の組み立てはコード側のテンプレートで行う
 // ============================================================
-/** 円形チャットアイコン用プロンプトの組み立て（シンプル背景＋大きな文字が主役） */
-export function buildIconPrompt(word: string): string {
-  return `あなたはプロのデザイナーです。オフ会のSNS用チャットアイコンをデザインしてください。
+const ICON_PROMPT_BASE = `あなたはプロのデザイナーです。オフ会のSNS用チャットアイコンをデザインしてください。
 ・完全な円形のアイコン
+・モチーフ・文字などすべての要素を円の内側に完全に収めること（円からは絶対にはみ出させない。円の縁との間に余白を残す）
+・小さく表示されても一目で内容が伝わる視認性とコントラスト
+・ごちゃつかせない`;
+
+/** 3スタイル分の完成プロンプトをコード側テンプレートで組み立てる */
+export function buildIconPromptCandidates(word: string, motif: string): IconStyleCandidate[] {
+  return [
+    {
+      key: 'text',
+      label: '文字メイン',
+      prompt: `${ICON_PROMPT_BASE}
 ・背景はシンプル（無地〜ゆるやかなグラデーション。細かい描写・イラストは入れない）
 ・中央に「${word}」という文字を大きく・はっきり・読みやすく配置（文字がアイコンの主役）
-・小さく表示されても一目で読める視認性とコントラスト
-・装飾は最小限。ごちゃつかせない`;
+・装飾は最小限`,
+    },
+    {
+      key: 'motif',
+      label: 'モチーフ＋文字',
+      prompt: `${ICON_PROMPT_BASE}
+・背景はシンプル（無地〜ゆるやかなグラデーション）
+・中央に「${motif}」のモチーフを大きく描く（アイコンの主役）
+・モチーフの下に「${word}」という文字を、一字一句このまま・読みやすく添える`,
+    },
+    {
+      key: 'clay',
+      label: 'ぷっくり3D',
+      prompt: `${ICON_PROMPT_BASE}
+・「${motif}」のモチーフを、ぷっくりとした3D（クレイ調で丸みがあり、柔らかく可愛い立体感のあるスタイル）で大きく描く
+・「${word}」という文字を、一字一句このまま・読みやすく配置する
+・明るく親しみやすい配色`,
+    },
+  ];
 }
 
 export async function generateIconPrompt(
@@ -810,36 +842,39 @@ export async function generateIconPrompt(
   basics: EventBasics
 ): Promise<IconPromptResult> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
-オフ会の「円形アイコン」の中央に大きく載せる、そのオフ会を最も表す短いワードを1つだけ選んでください。
+オフ会の円形チャットアイコンに使う素材を考えてください。
 
 ## オフ会の情報
 - タイトル: ${basics.title}
 - 内容: ${idea.summary}
 - 雰囲気: ${concept.cherish.join('、')}
 
-## ワードの条件
-- そのオフ会を最も的確に表す“名詞”のキーワードを1語だけ選ぶこと
-- 動詞・活用形（例:「形に」「集まろう」）、文の断片、助詞付き表現は絶対に禁止。必ず名詞（体言）で終えること
-- 短く（1〜6文字目安）、パッと見て何の会か伝わる語にすること
-- 良い例（名詞）: 朝活／もくもく／ボドゲ／副業／読書／交流／雑談／飲み会
-- 悪い例（動詞・断片。禁止）: 形に／語ろう／集まる／のために
+## 出力する素材
+- word: アイコンに載せる短い名詞（1〜6文字目安。例: 朝活／もくもく／ボドゲ／副業／読書会）
+  - タイトルにある言葉を使う場合は一字一句正確にコピーすること。文字の脱落・変更は厳禁（例:「スキルマ」を「スキマ」と書かない）
+  - 動詞・文の断片・助詞付き表現は禁止。必ず名詞で終えること
+- motif: オフ会の内容を象徴する具体的なモチーフ1つ（15文字以内。例: サイコロとカード、湯気の立つコーヒー、芽が出た貯金箱）
+- emoji: そのモチーフに最も近い絵文字1つ
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。
 
 \`\`\`json
-{ "word": "...", "styleNote": "主催者向けの補足（生成のコツ、40文字以内）" }
+{ "word": "...", "motif": "...", "emoji": "...", "styleNote": "主催者向けの補足（生成のコツ、40文字以内）" }
 \`\`\``;
 
   const text = await callGemini(apiKey, prompt);
   const parsed = extractJSON(text);
   const word = String(parsed?.word || '').trim();
+  const motif = String(parsed?.motif || '').trim();
   if (!word) {
-    throw new Error('アイコン用ワードの生成結果を読み取れませんでした。再度お試しください。');
+    throw new Error('アイコン用素材の生成結果を読み取れませんでした。再度お試しください。');
   }
   return {
     word,
-    prompt: buildIconPrompt(word),
+    motif: motif || word,
+    emoji: String(parsed?.emoji || '🎉').trim() || '🎉',
+    candidates: buildIconPromptCandidates(word, motif || word),
     styleNote: String(parsed?.styleNote || ''),
   };
 }
@@ -876,8 +911,7 @@ export async function generateThumbnailAssets(
 ## imagePromptの必須条件（プロンプト文に必ず含めること）
 - プロンプトは必ず「あなたはプロのデザイナーです。」という一文で書き始めること
 - 横長（16:9）の告知バナー構図
-- 画風は「ぷっくりとした3D（クレイ調で丸みがあり、柔らかく可愛い立体感のあるスタイル）」を指定すること
-- 会の内容が伝わる構図（人物が楽しそうに集まる様子など、内容が伝わるモチーフを指示する）
+- 会の内容が伝わる構図（人物が楽しそうに集まる様子など、内容が伝わるモチーフを指示する。画風は指定しない — 画風はツール側で別途付与します）
 - あなたが考えたキャッチーなタイトル（20文字以内）を、画像内で最も大きく目立つように配置すること
 - 日時「${dateTimeText}」と場所「${placeText}」を、タイトルより小さく読みやすいサイズで画像内に配置すること
 - 文字は背景との十分なコントラストを確保し、はっきり読めるようにすること

@@ -1,7 +1,7 @@
 import React from 'react';
 import { PlanIdea, IdeaCategory, normalizeIdeaCategory } from '../types';
 import { MAX_PINNED_IDEAS } from '../constants';
-import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, LanternIcon, UserIcon, MapPinIcon, SproutIcon, GroupIcon, BookOpenIcon, PenToolIcon, KeyIcon, KanpaiIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, LanternIcon, UserIcon, SproutIcon, GroupIcon, BookOpenIcon, PenToolIcon, KeyIcon, KanpaiIcon } from './icons';
 
 interface IdeasStepProps {
   ideas: PlanIdea[];
@@ -144,8 +144,8 @@ function IdeaCard({
           <dd>{idea.persona}</dd>
         </div>
         <div className="flex gap-1.5">
-          <dt className="shrink-0 text-slate-400"><MapPinIcon size={13} /></dt>
-          <dd>{idea.venueHint}・目安 {idea.recommendedCapacity}人</dd>
+          <dt className="shrink-0 text-slate-400"><GroupIcon size={13} /></dt>
+          <dd>目安 {idea.recommendedCapacity}人</dd>
         </div>
         <div className="flex gap-1.5">
           <dt className="shrink-0 text-slate-400"><SproutIcon size={13} /></dt>

@@ -30,7 +30,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             type="text"
             value={profile.organizerName}
             onChange={(e) => set({ organizerName: e.target.value })}
-            placeholder="例: さにー、たろう"
+            placeholder="例: リーマンくん、両子ママ"
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
           <p className="mt-1 text-xs text-slate-400">告知文・つぶやきの自己紹介で主催者名として使われます</p>
@@ -38,7 +38,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
 
         <div>
           <label htmlFor="selfIntro" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            自己紹介 <span className="text-red-500 text-xs">必須</span>
+            自己紹介・プロフィール <span className="text-red-500 text-xs">必須</span>
           </label>
           <textarea
             id="selfIntro"
@@ -101,7 +101,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             type="text"
             value={profile.plannedTheme}
             onChange={(e) => set({ plannedTheme: e.target.value })}
-            placeholder="例: ボードゲーム会、Claude Code勉強会。空欄ならAIが企画案をゼロから提案します"
+            placeholder="例: お茶会、AI勉強会、家計管理。空欄ならAIが企画案をゼロから提案します"
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
         </div>

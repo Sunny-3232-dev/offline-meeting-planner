@@ -83,10 +83,23 @@ export interface ScheduleItem {
   durationMinutes: number;
 }
 
-export interface IconPromptResult {
-  /** アイコンに大きく載せる短いワード */
-  word: string;
+/** チャットアイコンのスタイル候補（3方向。プロンプトはコード側テンプレートで組み立てる） */
+export interface IconStyleCandidate {
+  key: 'text' | 'motif' | 'clay';
+  label: string;
+  /** このスタイルの完成プロンプト全文 */
   prompt: string;
+}
+
+export interface IconPromptResult {
+  /** アイコンに載せる短いワード */
+  word: string;
+  /** オフ会を象徴するモチーフ（motif/clayスタイルで使用） */
+  motif: string;
+  /** プレビュー表示用の絵文字1つ */
+  emoji: string;
+  /** スタイル別のプロンプト候補（3件） */
+  candidates: IconStyleCandidate[];
   styleNote: string;
 }
 

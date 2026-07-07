@@ -19,6 +19,9 @@ function newItem(): ScheduleItem {
   return { id: crypto.randomUUID(), title: '', description: '', durationMinutes: 10 };
 }
 
+// 所要時間は10分刻みで選択（1分刻みの自由入力は細かすぎるため）
+const DURATION_CHOICES: number[] = Array.from({ length: 18 }, (_, i) => (i + 1) * 10);
+
 export default function ScheduleStep({
   schedule,
   basics,
@@ -94,16 +97,20 @@ export default function ScheduleStep({
                     {ranges[idx]}
                   </span>
                   <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={1}
-                      max={180}
-                      step={10}
+                    <select
                       value={item.durationMinutes}
-                      onChange={(e) => update(item.id, { durationMinutes: Math.max(1, Number(e.target.value) || 1) })}
+                      onChange={(e) => update(item.id, { durationMinutes: Number(e.target.value) })}
                       aria-label="所要時間（分）"
                       className="w-20 text-xs border border-slate-200 rounded-lg px-1.5 py-1 bg-slate-50 tabular-nums"
-                    />
+                    >
+                      {/* 旧データ等で10分刻み以外の値がある場合も表示できるようにする */}
+                      {!DURATION_CHOICES.includes(item.durationMinutes) && (
+                        <option value={item.durationMinutes}>{item.durationMinutes}</option>
+                      )}
+                      {DURATION_CHOICES.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
                     <span className="text-xs text-slate-500">分</span>
                   </div>
                 </div>

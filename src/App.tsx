@@ -38,6 +38,7 @@ import {
   generateAnnouncement,
   reviseAnnouncement,
   generateIconPrompt,
+  buildIconPromptCandidates,
   generateThumbnailAssets,
   generateShareTexts,
 } from './services/geminiService';
@@ -79,6 +80,22 @@ const INITIAL_BASICS: EventBasics = {
 /** 旧バージョンの保存データにofficeKey等が無くても壊れないようにマージする */
 function migrateBasics(stored: Partial<EventBasics> | null): EventBasics {
   return { ...INITIAL_BASICS, ...(stored || {}) };
+}
+
+/** 旧バージョンのiconPrompt（単一prompt形式）を3スタイル候補形式へ移行する */
+function migrateIconPrompt(stored: (Partial<IconPromptResult> & { prompt?: string }) | null): IconPromptResult | null {
+  if (!stored) return null;
+  if (Array.isArray(stored.candidates) && stored.candidates.length > 0) return stored as IconPromptResult;
+  const word = String(stored.word || '').trim();
+  if (!word) return null;
+  const motif = String(stored.motif || '').trim() || word;
+  return {
+    word,
+    motif,
+    emoji: String(stored.emoji || '').trim() || '🎉',
+    candidates: buildIconPromptCandidates(word, motif),
+    styleNote: String(stored.styleNote || ''),
+  };
 }
 
 /** 旧バージョンの保存データ（region）を新フィールド（desiredArea/venuePreference）へ移行する */
@@ -212,7 +229,7 @@ function AppContent() {
     () => loadFromStorage<string[]>('eventTags') || []
   );
   const [iconPrompt, setIconPrompt] = useState<IconPromptResult | null>(
-    () => loadFromStorage<IconPromptResult>('iconPrompt')
+    () => migrateIconPrompt(loadFromStorage<IconPromptResult>('iconPrompt'))
   );
   const [thumbnailAssets, setThumbnailAssets] = useState<ThumbnailAssets | null>(
     () => loadFromStorage<ThumbnailAssets>('thumbnailAssets')
@@ -464,7 +481,7 @@ function AppContent() {
     setSchedule(s.schedule || []);
     setAnnouncement(s.announcement || '');
     setEventTags(s.eventTags || []);
-    setIconPrompt(s.iconPrompt);
+    setIconPrompt(migrateIconPrompt(s.iconPrompt));
     setThumbnailAssets(s.thumbnailAssets);
     setShareTexts(s.shareTexts);
     setOffkaiChatUrl(s.offkaiChatUrl || '');
@@ -682,6 +699,13 @@ function AppContent() {
       setThumbLoading(false);
     }
   }, [apiKey, concept, activeIdea, basics, thumbLoading, ensureApiKey]);
+
+  /** アイコンに載せる文字を主催者が手で直す（3スタイルのプロンプトも組み立て直す） */
+  const handleChangeIconWord = useCallback((word: string) => {
+    setIconPrompt((prev) =>
+      prev ? { ...prev, word, candidates: buildIconPromptCandidates(word, prev.motif) } : prev
+    );
+  }, []);
 
   const runGenerateShareTexts = useCallback(async () => {
     if (!ensureApiKey() || !announcement) return;
@@ -979,6 +1003,7 @@ function AppContent() {
             thumbnailAssets={thumbnailAssets}
             iconLoading={iconLoading}
             thumbnailLoading={thumbLoading}
+            onChangeIconWord={handleChangeIconWord}
             onGenerateIcon={() => runGenerateIconPrompt()}
             onGenerateThumbnail={() => runGenerateThumbnail()}
             onNext={() => goToStep(AppStep.CHAT_SETUP)}
