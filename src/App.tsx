@@ -41,7 +41,7 @@ import {
   generateThumbnailAssets,
   generateShareTexts,
 } from './services/geminiService';
-import { formatDateJa, syncTimetableSection } from './utils/time';
+import { formatDateJa, removeTimetableSection } from './utils/time';
 import { MAX_PINNED_IDEAS, MAX_SAVED_EVENTS, officeLabel } from './constants';
 import StepIndicator, { stepOrder } from './components/StepIndicator';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -49,6 +49,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { KeyIcon } from './components/icons';
 import { EntakuLogo } from './components/Entaku';
 import { confirmDialog, ConfirmDialogHost } from './utils/confirmDialog';
+import { downloadBackup, parseBackup, applyBackup } from './utils/backup';
 
 const INITIAL_PROFILE: OrganizerProfile = {
   organizerName: '',
@@ -246,17 +247,17 @@ function AppContent() {
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
 
-  // 詳細（公開情報）ステップに入るたびに「■当日の流れ」を最新スケジュールへ機械同期する。
-  // ステップナビ（チップ）で直接ジャンプした場合も同期されるようにする（onNext経由でない導線の穴を塞ぐ）。
-  // syncTimetableSection は冪等なので、既に同期済みなら prev をそのまま返して再レンダーを避ける。
+  // 詳細（公開情報）ステップに入るたびに「■当日の流れ」セクションが残っていないか掃除する。
+  // 当日の流れは主催者だけが進行イメージのページで見る情報にし、公開情報には載せない。
+  // 旧バージョンで保存されたオフ会（セクション入り）の移行もこれで吸収する。
   useEffect(() => {
     if (step === AppStep.ANNOUNCEMENT && announcement) {
       setAnnouncement((prev) => {
-        const synced = syncTimetableSection(prev, basics, schedule);
-        return synced === prev ? prev : synced;
+        const cleaned = removeTimetableSection(prev);
+        return cleaned === prev ? prev : cleaned;
       });
     }
-    // step変更時のみ発火させたいので依存はstepのみ（basics/scheduleは発火時点の最新を参照）
+    // step変更時のみ発火させたいので依存はstepのみ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -412,6 +413,32 @@ function AppContent() {
     setStep(AppStep.PROFILE);
   }, [clearWorkspace]);
 
+  /** 全データをJSONファイルとしてダウンロード（APIキーは含めない） */
+  const handleExportBackup = useCallback(() => {
+    // デバウンス書き込み待ちの編集内容を確定させてから出力する
+    debouncedProfileRef.current?.flush();
+    debouncedAnnouncementRef.current?.flush();
+    debouncedBasicsRef.current?.flush();
+    debouncedScheduleRef.current?.flush();
+    downloadBackup();
+  }, []);
+
+  /** バックアップJSONを読み込んで全データを復元し、リロードして反映する */
+  const handleImportBackup = useCallback(async (file: File) => {
+    try {
+      const backup = parseBackup(await file.text());
+      const eventCount = Array.isArray(backup.data.events) ? backup.data.events.length : 0;
+      const ok = await confirmDialog(
+        `バックアップ（オフ会${eventCount}件）を読み込みます。いまこのブラウザに保存されている内容はすべて上書きされます。よろしいですか？`
+      );
+      if (!ok) return;
+      applyBackup(backup);
+      window.location.reload();
+    } catch (e: any) {
+      setError(e?.message || 'バックアップの読み込みに失敗しました。');
+    }
+  }, []);
+
   /** 新しいオフ会の企画を開始（保存枠が埋まっている場合は開始できない） */
   const startNewEvent = useCallback(() => {
     if (events.length >= MAX_SAVED_EVENTS) {
@@ -546,17 +573,35 @@ function AppContent() {
     }
   }, [apiKey, concept, activeIdea, basics, schedule, scheduleFeedbackHistory, ensureApiKey]);
 
-  const runGenerateAnnouncement = useCallback(async (feedback: string) => {
-    if (!ensureApiKey() || !concept || !activeIdea) return;
+  // 詳細（公開情報）は基本情報の完了時にバックグラウンドで先行生成し、待ち時間を減らす
+  // （タイムテーブルを載せない方針にしたため、進行イメージの完成を待つ必要がなくなった）
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+
+  const runGenerateAnnouncement = useCallback(async (
+    feedback: string,
+    opts?: { silent?: boolean; skipConfirm?: boolean }
+  ) => {
+    const silent = !!opts?.silent;
+    if (!concept || !activeIdea || announcementLoading) return;
+    if (silent) {
+      // 先行生成・バックグラウンド再生成: キー未設定なら黙って見送る
+      if (!apiKey) return;
+    } else if (!ensureApiKey()) {
+      return;
+    }
     const hasFeedback = !!feedback && feedback.trim().length > 0;
-    if (announcement && !hasFeedback) {
+    // skipConfirm: 呼び出し側で既に「作り直しますか？」の確認を取っている場合は二重に聞かない
+    if (!silent && !opts?.skipConfirm && announcement && !hasFeedback) {
       const ok = await confirmDialog('詳細（公開情報）をAIで書き直すと、いまの編集内容は上書きされます。よろしいですか？');
       if (!ok) return;
     }
-    setLoading(true);
-    setLoadingMessage('詳細（公開情報）の文章を書いています...');
-    setLoadingSourceText(`${basics.title} ${concept.purpose} ${concept.persona}`);
-    setError(null);
+    setAnnouncementLoading(true);
+    if (!silent) {
+      setLoading(true);
+      setLoadingMessage('詳細（公開情報）の文章を書いています...');
+      setLoadingSourceText(`${basics.title} ${concept.purpose} ${concept.persona}`);
+      setError(null);
+    }
     try {
       if (hasFeedback && announcement) {
         // 「書き直してほしい点」指定時は、現在表示中の詳細文をベースに、蓄積した指示履歴を反映して改訂する
@@ -566,8 +611,7 @@ function AppContent() {
           profile,
           announcement,
           nextHistory,
-          basics,
-          schedule
+          basics
         );
         setAnnouncement(result.body);
         setEventTags(result.tags);
@@ -578,7 +622,6 @@ function AppContent() {
           profile,
           concept,
           basics,
-          schedule,
           formatDateJa(basics.date)
         );
         setAnnouncement(result.body);
@@ -586,11 +629,13 @@ function AppContent() {
       }
       setAnnouncementSourceKey(announcementSourceFingerprint(basics, concept));
     } catch (e: any) {
-      setError(e?.message || '詳細（公開情報）の生成に失敗しました。');
+      // 先行生成の失敗は黙って見送る（詳細ステップで手動生成できる）
+      if (!silent) setError(e?.message || '詳細（公開情報）の生成に失敗しました。');
     } finally {
-      setLoading(false);
+      setAnnouncementLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [apiKey, profile, concept, activeIdea, basics, schedule, announcement, announcementFeedbackHistory, ensureApiKey]);
+  }, [apiKey, profile, concept, activeIdea, basics, announcement, announcementFeedbackHistory, announcementLoading, ensureApiKey]);
 
   // 画像プロンプトは待ち時間を作らないため、グローバルオーバーレイを使わず
   // バックグラウンドで生成する（BASICS完了時に先行生成を開始）。
@@ -705,6 +750,8 @@ function AppContent() {
             onOpenEvent={openEvent}
             onDeleteEvent={deleteEvent}
             onReset={handleReset}
+            onExport={handleExportBackup}
+            onImport={handleImportBackup}
           />
         );
       case AppStep.PROFILE:
@@ -824,17 +871,29 @@ function AppContent() {
             onSuggestCapacity={runSuggestCapacity}
             suggestingCapacity={suggestingCapacity}
             onNext={async () => {
-              // 基本情報を変更した後だと、既存の進行イメージ・画像は前提が食い違っている可能性がある
+              // 基本情報を変更した後だと、既存の進行イメージ・詳細（公開情報）・画像は前提が食い違っている可能性がある
               const currentKey = basicsConceptFingerprint(basics, concept);
               const scheduleStale =
                 schedule.length > 0 && scheduleSourceKey !== '' && currentKey !== scheduleSourceKey;
               const imagesStale =
                 (!!iconPrompt || !!thumbnailAssets) && imagesSourceKey !== '' && currentKey !== imagesSourceKey;
-              if (scheduleStale || imagesStale) {
-                const parts = [scheduleStale && '進行イメージ', imagesStale && '画像'].filter(Boolean);
+              const announcementStale =
+                !!announcement &&
+                announcementSourceKey !== '' &&
+                currentKey !== announcementSourceKey &&
+                // 旧バージョン（schedule込み指紋）は新フォーマットを前方一致で含むため一致とみなす
+                !announcementSourceKey.startsWith(`${currentKey}|`);
+              if (scheduleStale || imagesStale || announcementStale) {
+                const parts = [
+                  scheduleStale && '進行イメージ',
+                  announcementStale && '詳細（公開情報）',
+                  imagesStale && '画像',
+                ].filter(Boolean);
                 const ok = await confirmDialog(`基本情報が変更されています。${parts.join('・')}を作り直しますか？`);
                 if (ok) {
                   if (scheduleStale) runGenerateSchedule();
+                  // 詳細はバックグラウンドで作り直す（進行イメージの生成と並列）
+                  if (announcementStale) runGenerateAnnouncement('', { silent: true });
                   if (imagesStale) {
                     runGenerateIconPrompt({ silent: true });
                     runGenerateThumbnail({ silent: true });
@@ -842,11 +901,14 @@ function AppContent() {
                 } else {
                   // 作り直さない場合は「確認済み」として記録し、以後の誤検知を防ぐ
                   if (scheduleStale) setScheduleSourceKey(currentKey);
+                  if (announcementStale) setAnnouncementSourceKey(currentKey);
                   if (imagesStale) setImagesSourceKey(currentKey);
                 }
               } else {
                 if (schedule.length === 0) runGenerateSchedule();
-                // 画像プロンプトはここで材料が揃うので先行生成しておく（画像ステップで待たせない）
+                // 詳細（公開情報）・画像プロンプトはここで材料が揃うので先行生成しておく
+                // （進行イメージと並列で走らせ、後のステップで待たせない）
+                if (!announcement) runGenerateAnnouncement('', { silent: true });
                 if (!iconPrompt) runGenerateIconPrompt({ silent: true });
                 if (!thumbnailAssets) runGenerateThumbnail({ silent: true });
               }
@@ -864,15 +926,16 @@ function AppContent() {
             onRegenerate={(feedback) => runGenerateSchedule({ confirm: true, feedback })}
             feedbackHistory={scheduleFeedbackHistory}
             onNext={async () => {
+              // 詳細（公開情報）にタイムテーブルは載せないため、scheduleの変更はここでは影響しない
               if (!announcement) {
-                // 詳細（公開情報）が未生成 → 従来通りAIで生成（schedule込み、■当日の流れ挿入済み）
-                runGenerateAnnouncement('');
+                // 先行生成が失敗/未実行だった場合のフォールバック（生成中ならそのまま進んで待つ）
+                if (!announcementLoading) runGenerateAnnouncement('', { skipConfirm: true });
               } else {
                 // 基本情報・コンセプトを変更した後だと、既存の詳細文は前提が食い違っている可能性がある
+                // （ステップナビで直接ジャンプして基本情報を変えた場合などの保険）
                 const currentKey = announcementSourceFingerprint(basics, concept);
                 // 旧バージョン（schedule込み指紋）のannouncementSourceKeyは
                 // 新フォーマット（basicsConcept指紋）を前方一致で含むため、それも一致とみなす
-                // （バージョン移行直後にscheduleだけの変更を誤って「基本情報変更」と検知しないための互換対応）
                 const isLegacyMatch = announcementSourceKey.startsWith(`${currentKey}|`);
                 const stale =
                   announcementSourceKey !== '' && currentKey !== announcementSourceKey && !isLegacyMatch;
@@ -881,16 +944,10 @@ function AppContent() {
                     '基本情報が変更されています。詳細（公開情報）を作り直しますか？'
                   );
                   if (ok) {
-                    runGenerateAnnouncement('');
+                    runGenerateAnnouncement('', { skipConfirm: true });
                   } else {
                     setAnnouncementSourceKey(currentKey);
-                    // 作り直さない場合も「■当日の流れ」だけは最新のscheduleに機械同期する
-                    setAnnouncement(syncTimetableSection(announcement, basics, schedule));
                   }
-                } else {
-                  // 基本情報・コンセプトは変わっていない（scheduleだけの変更等）
-                  // → AIは呼ばず「■当日の流れ」だけを機械差し替え
-                  setAnnouncement(syncTimetableSection(announcement, basics, schedule));
                 }
               }
               goToStep(AppStep.ANNOUNCEMENT);
@@ -902,6 +959,7 @@ function AppContent() {
         return (
           <AnnouncementStep
             announcement={announcement}
+            loading={announcementLoading}
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
             feedbackHistory={announcementFeedbackHistory}

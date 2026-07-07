@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "pack": "rm -f offkai-planner-to-aistudio.zip && git ls-files --cached --others --exclude-standard | zip -X offkai-planner-to-aistudio.zip -@"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

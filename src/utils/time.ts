@@ -1,4 +1,4 @@
-import type { EventBasics, ScheduleItem } from '../types';
+import type { ScheduleItem } from '../types';
 
 /** 'HH:mm' に分を加算して 'HH:mm' を返す（24時超えは翌日扱いで折り返し） */
 export function addMinutes(hhmm: string, minutes: number): string {
@@ -47,99 +47,34 @@ export function formatEventDateJa(dateStr: string): string {
 const TIMETABLE_HEADING = '■当日の流れ';
 const NEXT_SECTION_MARK_RE = /^[■▶]/;
 
-/** schedule から「■当日の流れ」セクション文字列を機械生成する。空なら '' を返す */
-export function buildTimetableSection(basics: EventBasics, schedule: ScheduleItem[]): string {
-  if (schedule.length === 0) return '';
-  const ranges = computeTimeRanges(basics.startTime, schedule);
-  const lines = schedule.map(
-    (s, i) => `${ranges[i]} ${s.title}${s.description ? `（${s.description}）` : ''}`
-  );
-  return `${TIMETABLE_HEADING}\n${lines.join('\n')}`;
-}
-
 /**
- * 既存の詳細文（announcement）の「■当日の流れ」セクションを、
- * schedule から機械生成したタイムテーブルで同期する。
- * - 既存セクションがあれば置換
- * - 無ければ「■参加費用」の直前（それも無ければ末尾のガイドライン▶の直前）に挿入
- * - schedule が空ならセクションごと除去
+ * 詳細文（announcement）から「■当日の流れ」セクションを除去する。
+ * 当日の流れは主催者だけが進行イメージのページで見る情報にし、公開する詳細文には載せない方針。
+ * 旧バージョンで機械挿入されたセクションが保存データに残っている場合の掃除にも使う。
  */
-export function syncTimetableSection(
-  announcement: string,
-  basics: EventBasics,
-  schedule: ScheduleItem[]
-): string {
-  const newSection = buildTimetableSection(basics, schedule);
+export function removeTimetableSection(announcement: string): string {
+  if (!announcement || !announcement.includes(TIMETABLE_HEADING)) return announcement;
 
-  if (!announcement) return newSection;
-
-  // 既存の「■当日の流れ」セクションの範囲を探す（見出し行〜次の■/▶の手前まで）
+  // セクションの範囲を探す（見出し行〜次の■/▶の手前まで）
   const lines = announcement.split('\n');
-  let startIdx = -1;
+  const startIdx = lines.findIndex((l) => l.trim() === TIMETABLE_HEADING);
+  if (startIdx === -1) return announcement;
   let endIdx = lines.length; // 除外側の終端（この行の手前まで）
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() === TIMETABLE_HEADING) {
-      startIdx = i;
-      for (let j = i + 1; j < lines.length; j++) {
-        if (NEXT_SECTION_MARK_RE.test(lines[j].trim())) {
-          endIdx = j;
-          break;
-        }
-      }
+  for (let j = startIdx + 1; j < lines.length; j++) {
+    if (NEXT_SECTION_MARK_RE.test(lines[j].trim())) {
+      endIdx = j;
       break;
     }
   }
 
-  if (startIdx !== -1) {
-    // 既存セクションを新しいセクションで置換（無ければ丸ごと除去）
-    const before = lines.slice(0, startIdx);
-    const after = lines.slice(endIdx);
-    // beforeの末尾・afterの先頭の余分な空行を軽くトリム
-    while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
-    while (after.length > 0 && after[0].trim() === '') after.shift();
+  const before = lines.slice(0, startIdx);
+  const after = lines.slice(endIdx);
+  // beforeの末尾・afterの先頭の余分な空行を軽くトリム
+  while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
+  while (after.length > 0 && after[0].trim() === '') after.shift();
 
-    if (!newSection) {
-      // セクション除去。beforeとafterを1行空けて連結
-      const merged = [...before];
-      if (before.length > 0 && after.length > 0) merged.push('');
-      merged.push(...after);
-      return merged.join('\n').trim();
-    }
-
-    const merged = [...before];
-    if (before.length > 0) merged.push('');
-    merged.push(...newSection.split('\n'));
-    if (after.length > 0) merged.push('', ...after);
-    return merged.join('\n').trim();
-  }
-
-  // 既存セクションが無い場合
-  if (!newSection) return announcement.trim();
-
-  // 「■参加費用」の直前に挿入
-  const feeIdx = lines.findIndex((l) => l.trim().startsWith('■参加費用'));
-  if (feeIdx !== -1) {
-    const before = lines.slice(0, feeIdx);
-    while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
-    const after = lines.slice(feeIdx);
-    const merged = [...before];
-    if (before.length > 0) merged.push('');
-    merged.push(...newSection.split('\n'), '', ...after);
-    return merged.join('\n').trim();
-  }
-
-  // 「■参加費用」も無ければ、末尾のガイドライン（▶）の手前に挿入
-  const guidelineIdx = lines.findIndex((l) => l.trim().startsWith('▶'));
-  if (guidelineIdx !== -1) {
-    const before = lines.slice(0, guidelineIdx);
-    while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
-    const after = lines.slice(guidelineIdx);
-    const merged = [...before];
-    if (before.length > 0) merged.push('');
-    merged.push(...newSection.split('\n'), '', ...after);
-    return merged.join('\n').trim();
-  }
-
-  // どちらも無ければ末尾に追記
-  return `${announcement.trim()}\n\n${newSection}`;
+  const merged = [...before];
+  if (before.length > 0 && after.length > 0) merged.push('');
+  merged.push(...after);
+  return merged.join('\n').trim();
 }

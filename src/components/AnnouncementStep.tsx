@@ -3,6 +3,8 @@ import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon } from './icons';
 
 interface AnnouncementStepProps {
   announcement: string;
+  /** バックグラウンド先行生成が進行中かどうか */
+  loading?: boolean;
   onChange: (text: string) => void;
   /** feedbackが空文字の場合は初回生成（同条件での再生成）、それ以外は要望を反映して書き直す */
   onRegenerate: (feedback: string) => void;
@@ -14,6 +16,7 @@ interface AnnouncementStepProps {
 
 export default function AnnouncementStep({
   announcement,
+  loading = false,
   onChange,
   onRegenerate,
   feedbackHistory = [],
@@ -96,6 +99,13 @@ export default function AnnouncementStep({
             </div>
           </div>
         </>
+      ) : loading ? (
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center mb-8">
+          <div className="inline-block w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin mb-3" aria-hidden="true" />
+          <p className="text-sm text-slate-500" role="status">
+            AIが詳細（公開情報）の文章を書いています...（そのままお待ちください）
+          </p>
+        </div>
       ) : (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center mb-8">
           <p className="text-sm text-slate-500 mb-4">まだ詳細（公開情報）の文章がありません</p>

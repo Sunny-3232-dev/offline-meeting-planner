@@ -13,7 +13,7 @@ import type {
   ShareTexts,
   AnnouncementResult,
 } from '../types';
-import { syncTimetableSection } from '../utils/time';
+import { removeTimetableSection } from '../utils/time';
 
 const MODEL = 'gemini-2.5-flash';
 const MAX_RETRIES = 3;
@@ -517,7 +517,8 @@ ${conceptLines(concept)}
 - 冒頭にオープニング（挨拶・趣旨説明）、終盤にクロージング（まとめ・次回予告・解散）を入れること
 - 定員${basics.capacity}人が全員話せるよう、自己紹介の時間は1人あたり1〜2分で計算すること
 - descriptionには主催者向けの進行のコツを書くこと（50文字以内。例: 「主催者から先に話すと場が和みます」）
-- 項目数は5〜8個程度
+- 項目数は4〜5個。細かく刻みすぎず、大まかなブロックにまとめること
+- 休憩の項目は入れないこと（必要なら主催者があとから追加します）
 - 初主催者が迷わない、シンプルで無理のない進行にすること
 
 ## 出力形式（JSON）
@@ -637,7 +638,6 @@ export async function generateAnnouncement(
   profile: OrganizerProfile,
   concept: IdeaConcept,
   basics: EventBasics,
-  schedule: ScheduleItem[],
   formattedDate: string
 ): Promise<AnnouncementResult> {
   const venueLabel = venueLabelOf(basics);
@@ -659,7 +659,7 @@ ${organizerNameDirective(profile.organizerName)}
 
 ## 告知文（body）の構成（必ずこのテンプレート構成で出力すること）
 以下の見出し（■・▶）と改行構成を必ずそのまま使い、各セクションの中身だけを埋めてください。
-「■当日の流れ」セクションは含めないでください（別途システム側で自動挿入します）。
+「■当日の流れ」などのタイムテーブルセクションは絶対に含めないでください（当日の流れは主催者だけが見る別ページで管理し、公開情報には載せません）。
 
 \`\`\`
 ■イベント・オフ会内容
@@ -716,10 +716,9 @@ https://site.libecity.com/meetup-guidelines
   const tags: string[] = Array.isArray(parsed?.tags)
     ? parsed.tags.map(String).filter(Boolean).slice(0, 5)
     : [];
-  // 「■当日の流れ」はAIに書かせず、コード側で機械挿入する
-  const bodyWithTimetable = syncTimetableSection(ensureGuidelineFooter(body), basics, schedule);
+  // 万一AIが「■当日の流れ」を書いてしまった場合はコード側で除去する（公開情報には載せない方針）
   return {
-    body: bodyWithTimetable,
+    body: removeTimetableSection(ensureGuidelineFooter(body)),
     tags,
   };
 }
@@ -728,16 +727,14 @@ https://site.libecity.com/meetup-guidelines
  * 詳細（公開情報）の書き直し（「AIに書き直してほしい点」指定時）。
  * ゼロから再生成するのではなく、現在表示中の詳細文全文をベースに、
  * 蓄積された feedbackHistory（過去分＋今回分すべて）を反映した改訂版を返す。
- * テンプレ構成（■見出し）・固定文・マークダウン禁止は維持し、
- * 「■当日の流れ」はAIに触らせず、呼び出し側で syncTimetableSection により機械同期し直すこと。
+ * テンプレ構成（■見出し）・固定文・マークダウン禁止は維持する。
  */
 export async function reviseAnnouncement(
   apiKey: string,
   profile: OrganizerProfile,
   currentAnnouncement: string,
   feedbackHistory: string[],
-  basics: EventBasics,
-  schedule: ScheduleItem[]
+  basics: EventBasics
 ): Promise<AnnouncementResult> {
   const historyText =
     feedbackHistory.length > 0
@@ -762,7 +759,7 @@ ${organizerNameDirective(profile.organizerName)}
 ## 改訂方針（重要）
 - 現在の詳細文の内容・情報（日時・場所・定員など具体的な事実）を勝手に変えないこと。要望に関係ない部分はできるだけ元の文章を活かすこと
 - テンプレート構成（■イベント・オフ会内容 / ■参加費用 / ■参加方法 / ■募集期限 / ■注意事項 / ▶ オフ会ガイドラインはこちら）は必ずそのまま維持すること。見出しを増減・変更しないこと
-- 「■当日の流れ」セクションがある場合はそのまま残すか触れないこと（別途システム側で機械的に同期し直します）
+- 「■当日の流れ」セクションが残っている場合は丸ごと削除すること（当日の流れは主催者だけが見る別ページで管理し、公開情報には載せない方針になりました）
 - 「■参加方法」の本文2行目（「参加希望の方は、こちらのチャットに参加申請をお願いします。」）と、末尾の「▶ オフ会ガイドラインはこちら」「https://site.libecity.com/meetup-guidelines」の2行は、一字一句そのまま維持すること（絶対に変えない）
 - リベシティの仕様上、Markdown記法（# 見出し、**太字**、* 箇条書き など）は使用できません。絶対にアスタリスク「**」やシャープ「#」などのマークダウン記号は含めず、プレーンテキスト（空白行、改行、全角の「■」「▼」「・」など）を使って見やすく整形して出力してください
 
@@ -785,10 +782,9 @@ ${organizerNameDirective(profile.organizerName)}
   const tags: string[] = Array.isArray(parsed?.tags)
     ? parsed.tags.map(String).filter(Boolean).slice(0, 5)
     : [];
-  // 「■当日の流れ」はAIに任せず、コード側で機械同期し直す
-  const bodyWithTimetable = syncTimetableSection(ensureGuidelineFooter(body), basics, schedule);
+  // AIが削除し損ねた「■当日の流れ」もコード側で確実に除去する
   return {
-    body: bodyWithTimetable,
+    body: removeTimetableSection(ensureGuidelineFooter(body)),
     tags,
   };
 }
@@ -880,7 +876,8 @@ export async function generateThumbnailAssets(
 ## imagePromptの必須条件（プロンプト文に必ず含めること）
 - プロンプトは必ず「あなたはプロのデザイナーです。」という一文で書き始めること
 - 横長（16:9）の告知バナー構図
-- 会の内容が伝わる構図（画風は指定しない。人物が楽しそうに集まる様子など、内容が伝わるモチーフを指示する）
+- 画風は「ぷっくりとした3D（クレイ調で丸みがあり、柔らかく可愛い立体感のあるスタイル）」を指定すること
+- 会の内容が伝わる構図（人物が楽しそうに集まる様子など、内容が伝わるモチーフを指示する）
 - あなたが考えたキャッチーなタイトル（20文字以内）を、画像内で最も大きく目立つように配置すること
 - 日時「${dateTimeText}」と場所「${placeText}」を、タイトルより小さく読みやすいサイズで画像内に配置すること
 - 文字は背景との十分なコントラストを確保し、はっきり読めるようにすること

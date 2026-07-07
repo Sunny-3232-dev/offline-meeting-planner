@@ -5,6 +5,13 @@ import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon }
 
 const ONLINE_PLACE_OPTIONS = ['oVice', 'その他オンライン'] as const;
 
+// 開始時刻は15分刻みで選択（1分刻みの自由入力は違和感があるため）
+const TIME_OPTIONS: string[] = Array.from({ length: 24 * 4 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
+
 /** 通常モードの開催場所プルダウン値から venueType を導出する */
 function deriveVenueType(onlineTool: string): 'online' | 'offline' {
   return onlineTool === 'oVice' || onlineTool === 'その他オンライン' ? 'online' : 'offline';
@@ -120,13 +127,20 @@ export default function BasicsStep({
             </div>
             <div>
               <label htmlFor="startTime" className="block text-xs text-slate-500 mb-1">開始時刻</label>
-              <input
+              <select
                 id="startTime"
-                type="time"
                 value={basics.startTime}
                 onChange={(e) => set({ startTime: e.target.value })}
                 className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-              />
+              >
+                {/* 旧データ等で15分刻み以外の値が保存されている場合も表示できるようにする */}
+                {basics.startTime && !TIME_OPTIONS.includes(basics.startTime) && (
+                  <option value={basics.startTime}>{basics.startTime}</option>
+                )}
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="duration" className="block text-xs text-slate-500 mb-1">開催時間</label>
@@ -255,7 +269,7 @@ export default function BasicsStep({
                     venueDetail: composeNormalVenueDetail(basics.onlineTool, other),
                   });
                 }}
-                placeholder="例：市区町村・施設名"
+                placeholder="例：市区町村"
                 aria-label="開催場所の詳細"
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
               />

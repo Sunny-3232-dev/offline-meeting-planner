@@ -1,4 +1,4 @@
-const STORAGE_PREFIX = 'offkai-creator-';
+export const STORAGE_PREFIX = 'offkai-creator-';
 
 export function saveToStorage<T>(key: string, data: T): void {
   try {

@@ -15,6 +15,8 @@ interface HubProps {
   onOpenEvent: (id: string) => void;
   onDeleteEvent: (id: string) => void;
   onReset: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
 }
 
 const FLOW = [
@@ -42,6 +44,8 @@ export default function Hub({
   onOpenEvent,
   onDeleteEvent,
   onReset,
+  onExport,
+  onImport,
 }: HubProps) {
   return (
     <div className="relative min-h-[70vh] flex flex-col items-center justify-center py-12 px-4">
@@ -152,6 +156,30 @@ export default function Hub({
 
         <p className="mt-6 text-xs text-slate-400">
           入力した内容はこのブラウザの中にだけ保存されます（サーバーには送信されません）
+        </p>
+        <div className="mt-2 flex items-center justify-center gap-4">
+          <button
+            onClick={onExport}
+            className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600 transition-colors"
+          >
+            バックアップを保存
+          </button>
+          <label className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600 transition-colors cursor-pointer">
+            バックアップを読み込む
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImport(file);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-[11px] text-slate-400">
+          ブラウザの変更・キャッシュ削除でデータは消えます。大事なオフ会はバックアップを保存しておいてください
         </p>
       </div>
     </div>
