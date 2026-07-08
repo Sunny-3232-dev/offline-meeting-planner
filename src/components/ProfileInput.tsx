@@ -116,7 +116,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
           {isThemeDecided ? (
             <div>
               <label htmlFor="plannedTheme" className="block text-xs font-semibold text-slate-600 mb-1.5">
-                テーマ
+                テーマ <span className="text-red-500">必須</span>
               </label>
               <input
                 id="plannedTheme"
