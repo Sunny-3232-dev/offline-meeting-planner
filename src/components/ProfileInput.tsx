@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { OrganizerProfile, VenueType } from '../types';
 import { ArrowRightIcon } from './icons';
 
@@ -8,13 +8,27 @@ interface ProfileInputProps {
   onNext: () => void;
 }
 
+type ThemeChoice = 'yes' | 'no';
+
 export default function ProfileInput({ profile, onChange, onNext }: ProfileInputProps) {
-  const hasTheme = !!profile.plannedTheme.trim();
+  // 「企画は決まっているか」を明確な二択にする（小さい説明文だけでは伝わらなかったため）
+  const [themeChoice, setThemeChoice] = useState<ThemeChoice>(
+    () => (profile.plannedTheme.trim() ? 'yes' : 'no')
+  );
+  const isThemeDecided = themeChoice === 'yes';
   // テーマが決まっている場合、企画案はテーマから作るため自己紹介は必須にしない
   // （告知文の自己紹介欄には使われるが、空欄でも生成自体は進められる）
-  const canProceed = hasTheme || profile.selfIntro.trim().length >= 10;
+  const canProceed = isThemeDecided
+    ? profile.plannedTheme.trim().length > 0
+    : profile.selfIntro.trim().length >= 10;
 
   const set = (patch: Partial<OrganizerProfile>) => onChange({ ...profile, ...patch });
+
+  const chooseThemeDecided = () => setThemeChoice('yes');
+  const chooseThemeUndecided = () => {
+    setThemeChoice('no');
+    set({ plannedTheme: '' });
+  };
 
   return (
     <div className="max-w-2xl mx-auto py-8 animate-fade-in">
@@ -67,28 +81,66 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
         </div>
 
         <div>
-          <label htmlFor="plannedTheme" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            既に企画が決まっていますか？ <span className="text-slate-400 text-xs">任意</span>
-          </label>
-          <input
-            id="plannedTheme"
-            type="text"
-            value={profile.plannedTheme}
-            onChange={(e) => set({ plannedTheme: e.target.value })}
-            placeholder="例: お茶会、AI勉強会、家計管理"
-            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
-          <p className="mt-1 text-xs text-slate-400">
-            {hasTheme
-              ? '→ このテーマに沿った企画案を提案します（下の自己紹介は任意になります）'
-              : '→ 空欄の場合は「お金の5つの力」（貯める・稼ぐ・守る・増やす・使う）を軸に企画案を提案します'}
-          </p>
+          <span className="block text-sm font-semibold text-slate-700 mb-1.5">
+            企画は決まっていますか？ <span className="text-red-500 text-xs">必須</span>
+          </span>
+          <div className="flex gap-2 mb-3" role="radiogroup" aria-label="企画は決まっているか">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={!isThemeDecided}
+              onClick={chooseThemeUndecided}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                !isThemeDecided
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              決まっていない（AIに提案してほしい）
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isThemeDecided}
+              onClick={chooseThemeDecided}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                isThemeDecided
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              決まっている
+            </button>
+          </div>
+
+          {isThemeDecided ? (
+            <div>
+              <label htmlFor="plannedTheme" className="block text-xs font-semibold text-slate-600 mb-1.5">
+                テーマ
+              </label>
+              <input
+                id="plannedTheme"
+                type="text"
+                value={profile.plannedTheme}
+                onChange={(e) => set({ plannedTheme: e.target.value })}
+                placeholder="例: お茶会、AI勉強会、家計管理"
+                className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+              />
+              <p className="mt-1.5 text-xs text-sky-700 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">
+                このテーマに沿った企画案を提案します（下の自己紹介・プロフィールは任意になります）
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              「お金の5つの力」（貯める・稼ぐ・守る・増やす・使う）を軸に、AIが企画案を提案します
+            </p>
+          )}
         </div>
 
         <div>
           <label htmlFor="selfIntro" className="block text-sm font-semibold text-slate-700 mb-1.5">
             自己紹介・プロフィール{' '}
-            {hasTheme ? (
+            {isThemeDecided ? (
               <span className="text-slate-400 text-xs">任意</span>
             ) : (
               <span className="text-red-500 text-xs">必須</span>
@@ -103,7 +155,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
           <p className="mt-1 text-xs text-slate-400">
-            {hasTheme
+            {isThemeDecided
               ? '告知文の自己紹介にそのまま使われます。リベシティのプロフィール文の貼り付けでもOK'
               : '10文字以上。リベシティのプロフィール文の貼り付けでもOK。企画案づくりの参考にします'}
           </p>
@@ -111,7 +163,7 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
 
         <div>
           <label htmlFor="interests" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            興味・好きなこと <span className="text-slate-400 text-xs">任意</span>
+            特に興味がある・好きなこと <span className="text-slate-400 text-xs">任意</span>
           </label>
           <textarea
             id="interests"
