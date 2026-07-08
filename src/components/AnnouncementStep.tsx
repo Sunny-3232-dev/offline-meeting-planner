@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { VenueType } from '../types';
 import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon } from './icons';
 
 interface AnnouncementStepProps {
   announcement: string;
+  venueType: VenueType;
   /** バックグラウンド先行生成が進行中かどうか */
   loading?: boolean;
   onChange: (text: string) => void;
@@ -16,6 +18,7 @@ interface AnnouncementStepProps {
 
 export default function AnnouncementStep({
   announcement,
+  venueType,
   loading = false,
   onChange,
   onRegenerate,
@@ -68,6 +71,9 @@ export default function AnnouncementStep({
                 'オラオラ系で熱く',
                 '関西弁で親しみやすく',
                 '自己紹介を手厚く',
+                '初心者歓迎を強調',
+                // 対面は途中参加・退出を安易にOKにすると安全面のリスクがあるため、オンラインのみ表示
+                ...(venueType === 'online' ? ['途中参加・退出OKも書く'] : []),
               ].map((chip) => (
                 <button
                   key={chip}

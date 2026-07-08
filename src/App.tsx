@@ -984,6 +984,7 @@ function AppContent() {
         return (
           <AnnouncementStep
             announcement={announcement}
+            venueType={basics.venueType}
             loading={announcementLoading}
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
