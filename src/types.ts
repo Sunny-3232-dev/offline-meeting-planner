@@ -21,7 +21,6 @@ export interface OrganizerProfile {
   desiredArea: string;
   /** 既に企画が決まっている場合のテーマ（任意。入力があれば後続はこれに沿う） */
   plannedTheme: string;
-  hostingConcern: string;
 }
 
 /** 企画案に紐づく「軽いMVV」= 会のコンセプト */

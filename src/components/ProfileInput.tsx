@@ -9,7 +9,10 @@ interface ProfileInputProps {
 }
 
 export default function ProfileInput({ profile, onChange, onNext }: ProfileInputProps) {
-  const canProceed = profile.selfIntro.trim().length >= 10;
+  const hasTheme = !!profile.plannedTheme.trim();
+  // テーマが決まっている場合、企画案はテーマから作るため自己紹介は必須にしない
+  // （告知文の自己紹介欄には使われるが、空欄でも生成自体は進められる）
+  const canProceed = hasTheme || profile.selfIntro.trim().length >= 10;
 
   const set = (patch: Partial<OrganizerProfile>) => onChange({ ...profile, ...patch });
 
@@ -34,35 +37,6 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
           <p className="mt-1 text-xs text-slate-400">告知文・つぶやきの自己紹介で主催者名として使われます</p>
-        </div>
-
-        <div>
-          <label htmlFor="selfIntro" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            自己紹介・プロフィール <span className="text-red-500 text-xs">必須</span>
-          </label>
-          <textarea
-            id="selfIntro"
-            value={profile.selfIntro}
-            onChange={(e) => set({ selfIntro: e.target.value })}
-            rows={6}
-            placeholder="例: 会社員をしながら副業でブログを書いています。リベシティ歴1年。人と話すのは好きですが、大人数を仕切るのは苦手です…"
-            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
-          <p className="mt-1 text-xs text-slate-400">10文字以上。リベシティのプロフィールの貼り付けでも大丈夫です</p>
-        </div>
-
-        <div>
-          <label htmlFor="interests" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            興味・好きなこと <span className="text-slate-400 text-xs">任意</span>
-          </label>
-          <textarea
-            id="interests"
-            value={profile.interests}
-            onChange={(e) => set({ interests: e.target.value })}
-            rows={3}
-            placeholder="例: カフェ巡り、読書、投資の話、ボードゲーム、朝活"
-            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
-          />
         </div>
 
         <div>
@@ -105,25 +79,49 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
           <p className="mt-1 text-xs text-slate-400">
-            {profile.plannedTheme.trim()
-              ? '→ このテーマに沿った企画案を提案します'
+            {hasTheme
+              ? '→ このテーマに沿った企画案を提案します（下の自己紹介は任意になります）'
               : '→ 空欄の場合は「お金の5つの力」（貯める・稼ぐ・守る・増やす・使う）を軸に企画案を提案します'}
           </p>
         </div>
 
         <div>
-          <label htmlFor="hostingConcern" className="block text-sm font-semibold text-slate-700 mb-1.5">
-            初主催で不安なこと <span className="text-slate-400 text-xs">任意</span>
+          <label htmlFor="selfIntro" className="block text-sm font-semibold text-slate-700 mb-1.5">
+            自己紹介・プロフィール{' '}
+            {hasTheme ? (
+              <span className="text-slate-400 text-xs">任意</span>
+            ) : (
+              <span className="text-red-500 text-xs">必須</span>
+            )}
           </label>
           <textarea
-            id="hostingConcern"
-            value={profile.hostingConcern}
-            onChange={(e) => set({ hostingConcern: e.target.value })}
-            rows={2}
-            placeholder="例: 人が集まらなかったらどうしよう、当日の進行がうまくできるか心配"
+            id="selfIntro"
+            value={profile.selfIntro}
+            onChange={(e) => set({ selfIntro: e.target.value })}
+            rows={6}
+            placeholder="例: 会社員をしながら副業でブログを書いています。リベシティ歴1年。人と話すのは好きですが、大人数を仕切るのは苦手です…"
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
-          <p className="mt-1 text-xs text-slate-400">書いておくと、不安に寄り添った企画・進行になります</p>
+          <p className="mt-1 text-xs text-slate-400">
+            {hasTheme
+              ? '告知文の自己紹介にそのまま使われます。リベシティのプロフィール文の貼り付けでもOK'
+              : '10文字以上。リベシティのプロフィール文の貼り付けでもOK。企画案づくりの参考にします'}
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="interests" className="block text-sm font-semibold text-slate-700 mb-1.5">
+            興味・好きなこと <span className="text-slate-400 text-xs">任意</span>
+          </label>
+          <textarea
+            id="interests"
+            value={profile.interests}
+            onChange={(e) => set({ interests: e.target.value })}
+            rows={3}
+            placeholder="例: カフェ巡り、読書、投資の話、ボードゲーム、朝活"
+            className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
+          />
+          <p className="mt-1 text-xs text-slate-400">自己紹介に書いてあれば、繰り返さず空欄のままでOK</p>
         </div>
       </div>
 

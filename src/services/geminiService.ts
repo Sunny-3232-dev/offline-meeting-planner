@@ -241,7 +241,6 @@ ${category.direction}
 - 興味・好きなこと: ${profile.interests}
 - 開催したいエリア: ${profile.desiredArea || '未記入'}
 ${venuePreferenceDirective(profile)}
-- 初主催への不安: ${profile.hostingConcern || '特になし'}
 
 ## 各フィールドの意味
 - title: 企画名（30文字以内。参加者が内容をイメージできる具体的な名前）
@@ -310,7 +309,6 @@ async function generateThemedIdeas(apiKey: string, profile: OrganizerProfile): P
 - 興味・好きなこと: ${profile.interests}
 - 開催したいエリア: ${profile.desiredArea || '未記入'}
 ${venuePreferenceDirective(profile)}
-- 初主催への不安: ${profile.hostingConcern || '特になし'}
 
 ## 各フィールドの意味
 - title: 企画名（30文字以内。参加者が内容をイメージできる具体的な名前）

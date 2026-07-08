@@ -59,7 +59,6 @@ const INITIAL_PROFILE: OrganizerProfile = {
   venuePreference: 'offline',
   desiredArea: '',
   plannedTheme: '',
-  hostingConcern: '',
 };
 
 const INITIAL_BASICS: EventBasics = {
@@ -98,10 +97,12 @@ function migrateIconPrompt(stored: (Partial<IconPromptResult> & { prompt?: strin
   };
 }
 
-/** 旧バージョンの保存データ（region）を新フィールド（desiredArea/venuePreference）へ移行する */
-function migrateProfile(stored: (Partial<OrganizerProfile> & { region?: string }) | null): OrganizerProfile {
+/** 旧バージョンの保存データ（region・hostingConcern）を新フォーマットへ移行する */
+function migrateProfile(
+  stored: (Partial<OrganizerProfile> & { region?: string; hostingConcern?: string }) | null
+): OrganizerProfile {
   if (!stored) return INITIAL_PROFILE;
-  const { region, ...rest } = stored;
+  const { region, hostingConcern, ...rest } = stored;
   const migrated: OrganizerProfile = { ...INITIAL_PROFILE, ...rest };
   if (region && !migrated.desiredArea) {
     migrated.desiredArea = region;
