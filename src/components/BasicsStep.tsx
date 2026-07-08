@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { EventBasics, PlanIdea } from '../types';
 import { DURATION_OPTIONS, OFFICIAL_OFFICES, officeLabel, PREFECTURES } from '../constants';
 import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, SparklesIcon, AlertIcon } from './icons';
@@ -11,6 +11,9 @@ const TIME_OPTIONS: string[] = Array.from({ length: 24 * 4 }, (_, i) => {
   const m = (i % 4) * 15;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 });
+
+// オンライン開催は人数がざっくりになりやすいため、10人刻みの選択式にする
+const ONLINE_CAPACITY_OPTIONS: number[] = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 /** 通常モードの開催場所プルダウン値から venueType を導出する */
 function deriveVenueType(onlineTool: string): 'online' | 'offline' {
@@ -50,6 +53,23 @@ export default function BasicsStep({
   onBack,
 }: BasicsStepProps) {
   const set = (patch: Partial<EventBasics>) => onChange({ ...basics, ...patch });
+
+  // 定員入力: 入力途中で毎回2〜50にクランプすると、桁を打ち替える途中（例: 6→12で
+  // 一瞬空になる瞬間）に2へスナップして正しく入力できなくなるため、
+  // 編集中はローカルの文字列だけを自由に持たせ、フォーカスが外れた時にだけ確定・クランプする
+  const [capacityInput, setCapacityInput] = useState(String(basics.capacity));
+  useEffect(() => {
+    setCapacityInput(String(basics.capacity));
+  }, [basics.capacity]);
+  const commitCapacityInput = () => {
+    const trimmed = capacityInput.trim();
+    // Number('') は 0 になってしまうため、空欄は明示的に「無効」として前の値に戻す
+    const v = Number(trimmed);
+    const clamped =
+      trimmed !== '' && Number.isFinite(v) ? Math.min(50, Math.max(2, Math.round(v))) : basics.capacity;
+    setCapacityInput(String(clamped));
+    if (clamped !== basics.capacity) set({ capacity: clamped });
+  };
 
   const canProceed =
     basics.title.trim().length > 0 &&
@@ -283,37 +303,38 @@ export default function BasicsStep({
             定員（主催者含む） <span className="text-red-500 text-xs">必須</span>
           </span>
           <div className="flex flex-wrap items-center gap-3 mb-2">
-            <div className="flex items-center rounded-xl border border-slate-300 bg-white overflow-hidden">
-              <button
-                type="button"
-                onClick={() => set({ capacity: Math.max(2, basics.capacity - 1) })}
-                className="px-4 py-2.5 text-slate-500 hover:bg-slate-50 text-lg font-bold"
-                aria-label="定員を減らす"
-              >
-                −
-              </button>
-              <input
-                type="number"
-                min={2}
-                max={50}
+            {basics.venueType === 'online' ? (
+              // オンラインは人数がざっくりになりやすいため10人刻みの選択式にする
+              <select
                 value={basics.capacity}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (Number.isNaN(v)) return;
-                  set({ capacity: Math.min(50, Math.max(2, v)) });
-                }}
-                aria-label="定員を数値で入力"
-                className="w-16 text-center text-sm font-bold text-slate-800 tabular-nums focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => set({ capacity: Math.min(50, basics.capacity + 1) })}
-                className="px-4 py-2.5 text-slate-500 hover:bg-slate-50 text-lg font-bold"
-                aria-label="定員を増やす"
+                onChange={(e) => set({ capacity: Number(e.target.value) })}
+                aria-label="定員を選択"
+                className="px-3 py-2.5 text-sm font-bold text-slate-800 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white tabular-nums"
               >
-                ＋
-              </button>
-            </div>
+                {/* 旧データ等で10人刻み以外の値がある場合も表示できるようにする */}
+                {!ONLINE_CAPACITY_OPTIONS.includes(basics.capacity) && (
+                  <option value={basics.capacity}>{basics.capacity}</option>
+                )}
+                {ONLINE_CAPACITY_OPTIONS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            ) : (
+              // +/-ボタンと直接入力の両方があると冗長なため、直接入力のみにする
+              <div className="flex items-center rounded-xl border border-slate-300 bg-white overflow-hidden">
+                <input
+                  type="number"
+                  min={2}
+                  max={50}
+                  value={capacityInput}
+                  onChange={(e) => setCapacityInput(e.target.value)}
+                  onBlur={commitCapacityInput}
+                  onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                  aria-label="定員を数値で入力"
+                  className="w-16 text-center text-sm font-bold text-slate-800 tabular-nums focus:outline-none py-2.5"
+                />
+              </div>
+            )}
             <span className="text-xs text-slate-500">人</span>
             <button
               type="button"
