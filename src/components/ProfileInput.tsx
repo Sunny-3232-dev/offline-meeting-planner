@@ -101,9 +101,14 @@ export default function ProfileInput({ profile, onChange, onNext }: ProfileInput
             type="text"
             value={profile.plannedTheme}
             onChange={(e) => set({ plannedTheme: e.target.value })}
-            placeholder="例: お茶会、AI勉強会、家計管理。空欄ならAIが企画案をゼロから提案します"
+            placeholder="例: お茶会、AI勉強会、家計管理"
             className="w-full px-4 py-3 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white"
           />
+          <p className="mt-1 text-xs text-slate-400">
+            {profile.plannedTheme.trim()
+              ? '→ このテーマに沿った企画案を提案します'
+              : '→ 空欄の場合は「お金の5つの力」（貯める・稼ぐ・守る・増やす・使う）を軸に企画案を提案します'}
+          </p>
         </div>
 
         <div>
