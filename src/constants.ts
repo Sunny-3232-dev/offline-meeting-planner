@@ -75,6 +75,12 @@ export function branchChatUrl(id: string): string {
   return `https://libecity.com/room_list?room_id=${id}`;
 }
 
+// oVice（リベシティのオンラインスペース）内イベントの告知先チャット
+export const OVICE_CHAT_URL = 'https://libecity.com/room_list?room_id=VirtualOffice';
+
+// オフ会（オフラインイベント）に関するリベシティ公式FAQ
+export const LIBECITY_OFFLINE_EVENT_FAQ_URL = 'https://faq.libecity.com/category/offline-event';
+
 export function guessBranch(region?: string): BranchChat | null {
   if (!region) return null;
   const normalized = region.toLowerCase();

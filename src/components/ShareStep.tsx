@@ -1,7 +1,35 @@
 import React, { useState, useMemo } from 'react';
 import { ShareTexts, EventBasics } from '../types';
-import { BRANCH_CHATS, branchChatUrl, guessBranch } from '../constants';
+import { BRANCH_CHATS, OVICE_CHAT_URL, branchChatUrl, guessBranch } from '../constants';
+import { formatEventDateJa, extractAnnouncementSection } from '../utils/time';
 import { ChevronLeftIcon, RefreshIcon, CopyIcon, CheckIcon, SendIcon, KanpaiIcon } from './icons';
+
+/** oVice内イベント告知の定型テンプレート（リベシティのoViceチャットの公式テンプレに準拠） */
+function buildOviceEventText(basics: EventBasics, announcement: string, organizerName: string): string {
+  const detail = extractAnnouncementSection(announcement, '■イベント・オフ会内容') || basics.title;
+  const dateLine = basics.date
+    ? `${formatEventDateJa(basics.date)} ${basics.startTime}〜（${basics.durationMinutes}分）`
+    : '';
+  return [
+    '━━━━━━━━━━━━━━━━━━━',
+    '',
+    '📢 ovice内イベントを開催します！',
+    '',
+    '━━━━━━━━━━━━━━━━━━━',
+    '',
+    '■ イベント名',
+    basics.title || '（未定）',
+    '',
+    '■ 日時',
+    dateLine || '（未定）',
+    '',
+    '■ イベント運営メンバー',
+    organizerName || '（お名前）',
+    '',
+    '■ イベント内容詳細',
+    detail,
+  ].join('\n');
+}
 
 /** つぶやき本文 + オフ会チャットURL（任意）を結合して最終テキストを得る */
 function buildTweetText(body: string, chatUrl: string): string {
@@ -25,6 +53,8 @@ interface ShareStepProps {
   basics: EventBasics;
   region: string;
   offkaiChatUrl: string;
+  announcement: string;
+  organizerName: string;
   onChangeChatUrl: (url: string) => void;
   onGenerate: () => void;
   onBack: () => void;
@@ -77,14 +107,21 @@ export default function ShareStep({
   basics,
   region,
   offkaiChatUrl,
+  announcement,
+  organizerName,
   onChangeChatUrl,
   onGenerate,
   onBack,
   onFinish,
 }: ShareStepProps) {
   const tweetFinal = shareTexts ? buildTweetText(shareTexts.tweet, offkaiChatUrl) : '';
+  const isOvice = basics.venueType === 'online' && basics.onlineTool === 'oVice';
+  const oviceText = useMemo(
+    () => buildOviceEventText(basics, announcement, organizerName),
+    [basics, announcement, organizerName]
+  );
 
-  // 支部チャット: プロフィールの地域から自動推定し、手動でも選べる
+  // 支部チャット: プロフィールの地域から自動推定し、手動でも選べる（oVice開催時は使わない）
   const guessed = useMemo(() => guessBranch(region), [region]);
   const [branchId, setBranchId] = useState<string>(guessed?.id || '');
   const branch = BRANCH_CHATS.find((b) => b.id === branchId) || null;
@@ -112,49 +149,80 @@ export default function ShareStep({
 
       {shareTexts ? (
         <div className="space-y-4 mb-8">
-          {/* 支部チャットの選択と直リンク */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
-              <h3 className="text-sm font-bold text-slate-700">投稿先の支部チャット</h3>
-              {branch && (
-                <a
-                  href={branchChatUrl(branch.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition-colors"
-                >
-                  <SendIcon size={13} />
-                  {branch.name}チャットを開く
-                </a>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 mb-2">
-              {guessed ? `プロフィールの地域から「${guessed.name}」を推定しました。違う場合は選び直してください。` : 'お住まいの地域の公式支部チャットを選んでください。'}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {BRANCH_CHATS.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => setBranchId(b.id)}
-                  aria-pressed={branchId === b.id}
-                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
-                    branchId === b.id
-                      ? 'bg-sky-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {b.name}
-                </button>
-              ))}
-            </div>
-          </div>
+          {isOvice ? (
+            <>
+              {/* oVice開催時: 支部チャットではなく oVice内イベントチャットへ誘導 */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-bold text-slate-700">投稿先：oVice内イベントチャット</h3>
+                  <a
+                    href={OVICE_CHAT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+                  >
+                    <SendIcon size={13} />
+                    oViceチャットを開く
+                  </a>
+                </div>
+                <p className="text-xs text-slate-400">
+                  oVice開催のため、支部チャットではなくオンラインスペース（oVice）専用のイベントチャットに投稿しましょう。
+                </p>
+              </div>
 
-          <CopyCard
-            title={`${branch ? branch.name : `${region || '地域'}支部`}チャット向け`}
-            hint="上のボタンで支部チャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
-            text={appendUrl(shareTexts.regionalChat, offkaiChatUrl)}
-          />
+              <CopyCard
+                title="oViceチャット向け（公式テンプレート形式）"
+                hint="上のボタンでoViceチャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
+                text={appendUrl(oviceText, offkaiChatUrl)}
+              />
+            </>
+          ) : (
+            <>
+              {/* 支部チャットの選択と直リンク */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-bold text-slate-700">投稿先の支部チャット</h3>
+                  {branch && (
+                    <a
+                      href={branchChatUrl(branch.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+                    >
+                      <SendIcon size={13} />
+                      {branch.name}チャットを開く
+                    </a>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mb-2">
+                  {guessed ? `プロフィールの地域から「${guessed.name}」を推定しました。違う場合は選び直してください。` : 'お住まいの地域の公式支部チャットを選んでください。'}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BRANCH_CHATS.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => setBranchId(b.id)}
+                      aria-pressed={branchId === b.id}
+                      className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                        branchId === b.id
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <CopyCard
+                title={`${branch ? branch.name : `${region || '地域'}支部`}チャット向け`}
+                hint="上のボタンで支部チャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
+                text={appendUrl(shareTexts.regionalChat, offkaiChatUrl)}
+              />
+            </>
+          )}
 
           {/* つぶやき: すぐ呟ける導線 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5">

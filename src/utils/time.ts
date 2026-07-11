@@ -78,3 +78,22 @@ export function removeTimetableSection(announcement: string): string {
   merged.push(...after);
   return merged.join('\n').trim();
 }
+
+/**
+ * 詳細文（announcement）から指定した見出し（例: '■イベント・オフ会内容'）のセクション本文を抜き出す。
+ * 見出しが見つからない場合は空文字を返す。
+ */
+export function extractAnnouncementSection(announcement: string, heading: string): string {
+  if (!announcement) return '';
+  const lines = announcement.split('\n');
+  const startIdx = lines.findIndex((l) => l.trim() === heading);
+  if (startIdx === -1) return '';
+  let endIdx = lines.length;
+  for (let j = startIdx + 1; j < lines.length; j++) {
+    if (NEXT_SECTION_MARK_RE.test(lines[j].trim())) {
+      endIdx = j;
+      break;
+    }
+  }
+  return lines.slice(startIdx + 1, endIdx).join('\n').trim();
+}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { EventBasics } from '../types';
-import { LIBECITY_EVENT_CREATE_URL, officeLabel } from '../constants';
+import { LIBECITY_EVENT_CREATE_URL, LIBECITY_OFFLINE_EVENT_FAQ_URL, officeLabel } from '../constants';
 import { formatEventDateJa } from '../utils/time';
 import { ArrowRightIcon, ChevronLeftIcon, SendIcon, CopyIcon, CheckIcon } from './icons';
 
@@ -163,13 +163,36 @@ export default function ChatSetupStep({
             </div>
           </details>
         </div>
+        <p className="mt-3 text-xs text-sky-600/70">
+          オフ会について分からないことがあったら、
+          <a
+            href={LIBECITY_OFFLINE_EVENT_FAQ_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-sky-800"
+          >
+            リベシティ公式FAQ（オフ会・オフラインイベント）
+          </a>
+          もチェックしてみてください。
+        </p>
       </div>
 
       <div className="space-y-3 mb-8">
         <CopyField label="オフ会チャットルーム名" value={roomName} />
         <CopyField label="定員" value={`${basics.capacity}`} hideCopyButton />
+        <CopyField
+          label="日時"
+          value={`${datePart} ${basics.startTime}〜（${basics.durationMinutes}分）`}
+          hideCopyButton
+        />
+        <CopyField label="場所" value={placeLabel || '（未入力）'} hideCopyButton />
         <TagsField tags={eventTags} />
-        <CopyField label="詳細（公開）情報" value={announcement} longText />
+        <div>
+          <CopyField label="詳細（公開）情報" value={announcement} longText />
+          <p className="mt-1.5 text-[11px] text-slate-400 px-1">
+            💡 詳細情報の右側あたりに画像を1枚添えると、パッと見て楽しそうなオフ会に見えますよ
+          </p>
+        </div>
 
         {/* チャット参加者への限定公開情報 */}
         <div className="bg-white rounded-2xl border border-slate-200 p-4">

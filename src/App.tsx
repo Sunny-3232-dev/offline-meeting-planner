@@ -1044,6 +1044,8 @@ function AppContent() {
             basics={basics}
             region={computeRegionHint(basics)}
             offkaiChatUrl={offkaiChatUrl}
+            announcement={announcement}
+            organizerName={profile.organizerName}
             onChangeChatUrl={setOffkaiChatUrl}
             onGenerate={runGenerateShareTexts}
             onBack={() => setStep(AppStep.CHAT_SETUP)}
