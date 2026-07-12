@@ -19,6 +19,8 @@ import { removeTimetableSection } from '../utils/time';
 const MODEL = 'gemini-2.5-flash';
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 3000;
+// 無料枠の429は「1分あたり上限」由来が多く、少し待つだけで解消するため1回だけ自動再試行する
+const RATE_LIMIT_RETRY_DELAY_MS = 30000;
 
 function getClient(apiKey: string) {
   return new GoogleGenAI({ apiKey });
@@ -37,11 +39,25 @@ function classifyError(error: any): { type: 'rate-limit' | 'auth' | 'network' | 
   const errorStr = error?.message || String(error);
   const status = error?.status || error?.code;
 
-  if (status === 429 || errorStr.includes('quota') || errorStr.includes('rate limit')) {
+  if (status === 429 || errorStr.includes('quota') || errorStr.includes('rate limit') || errorStr.includes('RESOURCE_EXHAUSTED')) {
     return {
       type: 'rate-limit',
       message:
-        'APIの利用上限に達しました。しばらく待ってから再実行するか、画面右上の鍵アイコンから別のGemini APIキーを設定して再実行してください。',
+        '無料枠の利用上限に達しました。' +
+        '1分あたりの上限であることが多く、その場合は1分ほど待ってから再実行すると直ります（自動での再試行も1回行っています）。' +
+        '何度も出る場合は1日あたりの上限に達している可能性があり、翌日まで待つか、別のGoogleアカウントで作成したAPIキーを画面右上の鍵アイコンから設定してください。' +
+        '※上限はAPIキーではなくGoogleアカウント単位のため、同じアカウントでキーを作り直しても解消しません。',
+    };
+  }
+  // AI Studio経由の自動キーが未発行・未同意のアカウントで出る（初回利用者に多い）
+  if (/permission.?denied/i.test(errorStr) || errorStr.includes('PERMISSION_DENIED')) {
+    return {
+      type: 'auth',
+      message:
+        'Gemini APIの利用権限がありません（初めてのアカウントでよく起きます）。' +
+        '別タブで https://aistudio.google.com/apikey を開いて利用規約に同意しAPIキーを作成してから、このアプリに戻って再実行してください。' +
+        'それでも解決しない場合は、作成したAPIキーを画面右上の鍵アイコンから直接設定してください' +
+        '（会社・学校のGoogleアカウントでは管理者によりAI Studioが無効化されていることがあります。その場合は個人アカウントをお使いください）。',
     };
   }
   if (status === 401 || status === 403 || errorStr.includes('API key') || errorStr.includes('unauthorized')) {
@@ -73,7 +89,14 @@ async function callGemini(apiKey: string, prompt: string, retryCount = 0): Promi
   } catch (error: any) {
     const classification = classifyError(error);
 
-    // Retry only on transient network errors (NOT on rate-limit, which would burn quota)
+    // 無料枠の1分あたり上限（429）は待てば解消することが多いので、30秒待って1回だけ再試行する
+    // （連打で日次クォータを消費しないよう1回に限定）
+    if (classification.type === 'rate-limit' && retryCount === 0) {
+      await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_RETRY_DELAY_MS));
+      return callGemini(apiKey, prompt, retryCount + 1);
+    }
+
+    // Retry only on transient network errors
     if (classification.type === 'network' && retryCount < MAX_RETRIES) {
       const delayMs = RETRY_DELAY_MS * Math.pow(2, retryCount);
       await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -249,17 +272,21 @@ function ideasFeedbackSection(feedbackHistory: string[]): string {
   return `\n## 主催者からの追加の要望（すべて反映すること）\n${lines}\n`;
 }
 
-async function generateIdeasForCategory(
+/** 無料枠のRPM上限対策のため、複数ジャンルを1リクエストにまとめて生成する（6並列→2並列） */
+async function generateIdeasForCategoryGroup(
   apiKey: string,
   profile: OrganizerProfile,
-  category: { id: IdeaCategory; label: string; direction: string },
+  categories: { id: IdeaCategory; label: string; direction: string }[],
   feedbackHistory: string[]
 ): Promise<PlanIdea[]> {
+  const categorySections = categories
+    .map((c) => `### ${c.id}（${c.label}）\n${c.direction}`)
+    .join('\n');
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
-初めてオフ会を主催する人のために、「${category.label}」のオフ会企画案を${IDEAS_PER_CATEGORY}件提案してください。
+初めてオフ会を主催する人のために、以下の${categories.length}ジャンルそれぞれについて、オフ会企画案を各${IDEAS_PER_CATEGORY}件提案してください。
 
-## ${category.label}とは
-${category.direction}
+## ジャンル一覧
+${categorySections}
 
 ## 主催者プロフィール
 - 自己紹介: ${profile.selfIntro}
@@ -281,49 +308,57 @@ ${ideasFeedbackSection(feedbackHistory)}
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
 ${communityToneNote(profile)}
 - 会場手配・機材・事前準備のハードルが高い企画は避けること
+- 各案は必ずそのジャンルのテーマに沿わせること。ジャンルをまたいだ内容の重複は避けること
 ${feedbackHistory.length > 0 ? '- 「主催者からの追加の要望」は、当たり障りのない範囲に薄めず、要望の意図どおりに企画へ反映すること\n' : ''}
-- ${IDEAS_PER_CATEGORY}件はテーマ・時間帯にバリエーションを持たせること
-- 主催者の個性やニッチな趣味に引っ張られすぎないこと。初主催者は突飛な会だと立てづらいので、まずは「${category.label}」というお金のテーマに沿った王道・定番の形（上記「${category.label}とは」の例のような、参加者がイメージしやすく集まりやすい形）を優先する
+- 各ジャンルの${IDEAS_PER_CATEGORY}件はテーマ・時間帯にバリエーションを持たせること
+- 主催者の個性やニッチな趣味に引っ張られすぎないこと。初主催者は突飛な会だと立てづらいので、まずは各ジャンルのお金のテーマに沿った王道・定番の形（上記「ジャンル一覧」の例のような、参加者がイメージしやすく集まりやすい形）を優先する
 - 興味・好きなことは、会話のきっかけや切り口として“軽く”反映する程度でよい（企画の主役をニッチな個性にしない）
 - personaとpurposeは企画ごとに具体的に変えること（汎用文の使い回しをしない）
 
 ## 出力形式（JSON）
-必ず有効なJSONのみを出力してください。
+必ず有効なJSONのみを出力してください。ジャンルID（${categories.map((c) => c.id).join(' / ')}）をキーにしたオブジェクトで、各キーに${IDEAS_PER_CATEGORY}件の配列を入れます。
 
 \`\`\`json
-[
-  {
-    "title": "...",
-    "summary": "...",
-    "persona": "...",
-    "purpose": "...",
-    "cherish": ["...", "..."],
-    "recommendedCapacity": 6,
-    "firstTimerFriendlyPoint": "..."
-  }
-]
+{
+  "${categories[0].id}": [
+    {
+      "title": "...",
+      "summary": "...",
+      "persona": "...",
+      "purpose": "...",
+      "cherish": ["...", "..."],
+      "recommendedCapacity": 6,
+      "firstTimerFriendlyPoint": "..."
+    }
+  ]
+}
 \`\`\``;
 
   const text = await callGemini(apiKey, prompt);
   const parsed = extractJSON(text);
-  const list: any[] = Array.isArray(parsed) ? parsed : parsed?.ideas || [];
-  if (!Array.isArray(list) || list.length === 0) {
+  const ideas: PlanIdea[] = [];
+  for (const category of categories) {
+    const list: any[] = Array.isArray(parsed?.[category.id]) ? parsed[category.id] : [];
+    for (const i of list) {
+      if (!i || !i.title) continue;
+      ideas.push({
+        id: crypto.randomUUID(),
+        category: category.id,
+        title: String(i.title || ''),
+        summary: String(i.summary || ''),
+        persona: String(i.persona || ''),
+        purpose: String(i.purpose || ''),
+        cherish: Array.isArray(i.cherish) ? i.cherish.map(String).slice(0, 3) : [],
+        venueHint: String(i.venueHint || ''),
+        recommendedCapacity: Number(i.recommendedCapacity) || 6,
+        firstTimerFriendlyPoint: String(i.firstTimerFriendlyPoint || ''),
+      });
+    }
+  }
+  if (ideas.length === 0) {
     throw new Error('企画案の生成結果を読み取れませんでした。再度お試しください。');
   }
-  return list
-    .filter((i) => i && i.title)
-    .map((i) => ({
-      id: crypto.randomUUID(),
-      category: category.id,
-      title: String(i.title || ''),
-      summary: String(i.summary || ''),
-      persona: String(i.persona || ''),
-      purpose: String(i.purpose || ''),
-      cherish: Array.isArray(i.cherish) ? i.cherish.map(String).slice(0, 3) : [],
-      venueHint: String(i.venueHint || ''),
-      recommendedCapacity: Number(i.recommendedCapacity) || 6,
-      firstTimerFriendlyPoint: String(i.firstTimerFriendlyPoint || ''),
-    }));
+  return ideas;
 }
 
 /** 主催者が既にテーマを決めている場合: そのテーマに沿った企画案を5件だけ生成 */
@@ -409,9 +444,11 @@ export async function generatePlanIdeas(
   if (profile.plannedTheme && profile.plannedTheme.trim()) {
     return generateThemedIdeas(apiKey, profile, feedbackHistory);
   }
-  // 空の場合は従来どおり王道系・テーマ系を並列生成（片方が失敗しても全滅させない）
+  // 空の場合は6ジャンルを2グループ（3ジャンル×4案）に分けて並列生成（片方が失敗しても全滅させない）
+  // ※6並列で呼ぶと無料枠の1分あたりリクエスト上限（RPM）に達しやすいため2リクエストに抑えている
+  const groups = [IDEA_CATEGORIES.slice(0, 3), IDEA_CATEGORIES.slice(3)];
   const results = await Promise.allSettled(
-    IDEA_CATEGORIES.map((c) => generateIdeasForCategory(apiKey, profile, c, feedbackHistory))
+    groups.map((g) => generateIdeasForCategoryGroup(apiKey, profile, g, feedbackHistory))
   );
   const ideas = results
     .filter((r): r is PromiseFulfilledResult<PlanIdea[]> => r.status === 'fulfilled')
@@ -981,8 +1018,13 @@ export async function generateShareTexts(
   basics: EventBasics,
   region: string,
   formattedDate: string,
-  organizerName?: string
+  organizerName?: string,
+  feedbackHistory: string[] = []
 ): Promise<ShareTexts> {
+  const historyText =
+    feedbackHistory.length > 0
+      ? feedbackHistory.map((f, i) => `${i + 1}. ${f}`).join('\n')
+      : '';
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 以下のオフ会告知文をもとに、2つの場所に投稿する文章を作ってください。
 
@@ -994,7 +1036,7 @@ ${announcement}
 - 日時: ${formattedDate} ${basics.startTime}〜
 - 主催者の地域: ${region || '未記入'}
 ${organizerNameDirective(organizerName || '')}
-
+${historyText ? `\n## 主催者からの書き直し要望（これまでに伝えた分をすべて含む。両方の文章に反映すること）\n${historyText}\n` : ''}
 ## 作る文章
 1. regionalChat: 地域支部チャット（例: 関東チャット）向け
    - 「${region || '地域'}の皆さん」への呼びかけで始める
@@ -1007,7 +1049,7 @@ ${organizerNameDirective(organizerName || '')}
    - 「初主催」「初めて主催する」等は、元の告知文に本人がそう書いている場合のみ触れてよく、書かれていない場合は絶対に書かないこと（事実と異なる可能性があるため）
 
 ## 注意
-- 主催者本人の名前には「さん」など敬称を付けないこと（一人称）。参加者や他の人には従来通り敬称OK
+- 主催者本人の名前には「さん」など敬称を付けないこと（一人称）。参加者や他の人には従来通り敬称OK${historyText ? '\n- 書き直し要望は当たり障りのない範囲に薄めず、要望の意図どおりに反映すること' : ''}
 
 ## 出力形式（JSON）
 必ず有効なJSONのみを出力してください。

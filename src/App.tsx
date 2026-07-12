@@ -265,6 +265,10 @@ function AppContent() {
   const [ideasFeedbackHistory, setIdeasFeedbackHistory] = useState<string[]>(
     () => loadFromStorage<string[]>('ideasFeedbackHistory') || []
   );
+  // 告知文（支部チャット・つぶやき）の「書き直してほしい点」の蓄積履歴（オフ会ごと）
+  const [shareFeedbackHistory, setShareFeedbackHistory] = useState<string[]>(
+    () => loadFromStorage<string[]>('shareFeedbackHistory') || []
+  );
 
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
@@ -345,6 +349,7 @@ function AppContent() {
   useEffect(() => { saveToStorage('announcementFeedbackHistory', announcementFeedbackHistory); }, [announcementFeedbackHistory]);
   useEffect(() => { saveToStorage('scheduleFeedbackHistory', scheduleFeedbackHistory); }, [scheduleFeedbackHistory]);
   useEffect(() => { saveToStorage('ideasFeedbackHistory', ideasFeedbackHistory); }, [ideasFeedbackHistory]);
+  useEffect(() => { saveToStorage('shareFeedbackHistory', shareFeedbackHistory); }, [shareFeedbackHistory]);
 
   // 編集中のオフ会スナップショットを保存済みイベントに同期
   useEffect(() => {
@@ -368,11 +373,12 @@ function AppContent() {
       announcementFeedbackHistory,
       scheduleFeedbackHistory,
       ideasFeedbackHistory,
+      shareFeedbackHistory,
     };
     setEvents((prev) =>
       prev.map((ev) => (ev.id === activeEventId ? { ...ev, updatedAt: Date.now(), snapshot } : ev))
     );
-  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory, ideasFeedbackHistory]);
+  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory, ideasFeedbackHistory, shareFeedbackHistory]);
 
   const goToStep = useCallback((next: AppStep) => {
     setStep(next);
@@ -420,6 +426,7 @@ function AppContent() {
     setAnnouncementFeedbackHistory([]);
     setScheduleFeedbackHistory([]);
     setIdeasFeedbackHistory([]);
+    setShareFeedbackHistory([]);
   }, []);
 
   const handleReset = useCallback(async () => {
@@ -501,6 +508,7 @@ function AppContent() {
     setAnnouncementFeedbackHistory(s.announcementFeedbackHistory || []);
     setScheduleFeedbackHistory(s.scheduleFeedbackHistory || []);
     setIdeasFeedbackHistory(s.ideasFeedbackHistory || []);
+    setShareFeedbackHistory(s.shareFeedbackHistory || []);
     setStep(s.maxReached || AppStep.BASICS);
   }, [events]);
 
@@ -716,8 +724,11 @@ function AppContent() {
     );
   }, []);
 
-  const runGenerateShareTexts = useCallback(async () => {
+  /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
+  const runGenerateShareTexts = useCallback(async (feedback?: string) => {
     if (!ensureApiKey() || !announcement) return;
+    const trimmed = feedback?.trim();
+    const nextHistory = trimmed ? [...shareFeedbackHistory, trimmed] : shareFeedbackHistory;
     setLoading(true);
     setLoadingMessage('チャット・つぶやき用の文章を書いています...');
     setLoadingSourceText(announcement.slice(0, 200));
@@ -731,16 +742,18 @@ function AppContent() {
           basics,
           regionHint,
           formatDateJa(basics.date),
-          profile.organizerName
+          profile.organizerName,
+          nextHistory
         )
       );
+      if (trimmed) setShareFeedbackHistory(nextHistory);
       setShareSourceKey(shareSourceFingerprint(basics, announcement, regionHint));
     } catch (e: any) {
       setError(e?.message || '展開用文章の生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, announcement, basics, profile, ensureApiKey]);
+  }, [apiKey, announcement, basics, profile, shareFeedbackHistory, ensureApiKey]);
 
   /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
   const runGenerateIdeas = useCallback(async (feedback?: string) => {
@@ -858,6 +871,7 @@ function AppContent() {
                 setShareSourceKey('');
                 setAnnouncementFeedbackHistory([]);
                 setScheduleFeedbackHistory([]);
+                setShareFeedbackHistory([]);
               }
               if (!activeEventId) {
                 // 新規オフ会の開始時のみ、プロフィールの開催希望をbasics.venueTypeへ反映する
@@ -889,6 +903,7 @@ function AppContent() {
                       announcementFeedbackHistory: [],
                       scheduleFeedbackHistory: [],
                       ideasFeedbackHistory,
+                      shareFeedbackHistory: [],
                     },
                   },
                 ]);
@@ -1063,6 +1078,7 @@ function AppContent() {
             organizerName={profile.organizerName}
             onChangeChatUrl={setOffkaiChatUrl}
             onGenerate={runGenerateShareTexts}
+            feedbackHistory={shareFeedbackHistory}
             onBack={() => setStep(AppStep.CHAT_SETUP)}
             onFinish={() => setStep(AppStep.HUB)}
           />

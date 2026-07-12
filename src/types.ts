@@ -141,6 +141,8 @@ export interface EventSnapshot {
   scheduleFeedbackHistory: string[];
   /** 企画案の「こういうのがいい」の蓄積履歴（オフ会ごと） */
   ideasFeedbackHistory: string[];
+  /** 告知文（支部チャット・つぶやき）の「書き直してほしい点」の蓄積履歴（オフ会ごと） */
+  shareFeedbackHistory: string[];
 }
 
 export interface SavedEvent {

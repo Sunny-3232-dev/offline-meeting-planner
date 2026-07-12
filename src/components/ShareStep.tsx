@@ -56,7 +56,10 @@ interface ShareStepProps {
   announcement: string;
   organizerName: string;
   onChangeChatUrl: (url: string) => void;
-  onGenerate: () => void;
+  /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
+  onGenerate: (feedback: string) => void;
+  /** これまでに蓄積された「書き直してほしい点」の履歴（オフ会ごと） */
+  feedbackHistory?: string[];
   onBack: () => void;
   onFinish: () => void;
 }
@@ -111,10 +114,17 @@ export default function ShareStep({
   organizerName,
   onChangeChatUrl,
   onGenerate,
+  feedbackHistory = [],
   onBack,
   onFinish,
 }: ShareStepProps) {
   const tweetFinal = shareTexts ? buildTweetText(shareTexts.tweet, offkaiChatUrl) : '';
+  const [feedback, setFeedback] = useState('');
+
+  const handleRegenerate = () => {
+    onGenerate(feedback);
+    setFeedback('');
+  };
   const isOvice = basics.venueType === 'online' && basics.onlineTool === 'oVice';
   const oviceText = useMemo(
     () => buildOviceEventText(basics, announcement, organizerName),
@@ -250,19 +260,37 @@ export default function ShareStep({
             </p>
           </div>
 
-          <button
-            onClick={onGenerate}
-            className="inline-flex items-center gap-1.5 text-xs text-sky-600 hover:text-sky-800 transition-colors"
-          >
-            <RefreshIcon size={13} />
-            文章を作り直す
-          </button>
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+            <label htmlFor="shareFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
+              AIに書き直してほしい点を教えてください
+            </label>
+            {feedbackHistory.length > 0 && (
+              <p className="text-[11px] text-slate-400 mb-2">
+                これまでに伝えた指示（{feedbackHistory.length}件）を踏まえて書き直します: {feedbackHistory.join(' / ')}
+              </p>
+            )}
+            <textarea
+              id="shareFeedback"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              rows={2}
+              placeholder="例: もっとカジュアルに／絵文字を減らして／短くまとめて"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white mb-2"
+            />
+            <button
+              onClick={handleRegenerate}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+            >
+              <RefreshIcon size={13} />
+              文章を作り直す
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center mb-8">
           <p className="text-sm text-slate-500 mb-4">支部チャット用・つぶやき用の文章を作ります</p>
           <button
-            onClick={onGenerate}
+            onClick={() => onGenerate('')}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 transition-colors"
           >
             展開用の文章を生成する
