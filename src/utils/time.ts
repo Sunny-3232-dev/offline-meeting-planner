@@ -80,6 +80,52 @@ export function removeTimetableSection(announcement: string): string {
 }
 
 /**
+ * 進行イメージから「■当日の流れ」セクション文字列を組み立てる（時刻＋項目タイトルのみ）。
+ * 項目の説明メモは主催者向けの進行のコツなので公開文には含めない。
+ * タイトルのある項目が1つもなければ空文字を返す。
+ */
+export function buildTimetableSection(startTime: string, schedule: ScheduleItem[]): string {
+  const ranges = computeTimeRanges(startTime, schedule);
+  const lines = schedule
+    .map((item, idx) => ({ title: item.title.trim(), range: ranges[idx] }))
+    .filter(({ title }) => title !== '')
+    .map(({ range, title }) => `${range} ${title}`);
+  if (lines.length === 0) return '';
+  return [TIMETABLE_HEADING, ...lines].join('\n');
+}
+
+/**
+ * 詳細文（announcement）に「■当日の流れ」セクションを挿入・更新する。
+ * 既存の同セクションは削除してから、■イベント・オフ会内容の直後に入れ直す（冪等）。
+ * ■イベント・オフ会内容が見つからない場合は末尾に追記する。
+ */
+export function insertTimetableSection(announcement: string, section: string): string {
+  const base = removeTimetableSection(announcement);
+  if (!section) return base;
+
+  const lines = base.split('\n');
+  const contentIdx = lines.findIndex((l) => l.trim() === '■イベント・オフ会内容');
+  if (contentIdx === -1) {
+    return `${base.trim()}\n\n${section}`;
+  }
+  // ■イベント・オフ会内容セクションの終端（次の■/▶見出しの手前）を探す
+  let insertIdx = lines.length;
+  for (let j = contentIdx + 1; j < lines.length; j++) {
+    if (NEXT_SECTION_MARK_RE.test(lines[j].trim())) {
+      insertIdx = j;
+      break;
+    }
+  }
+  const before = lines.slice(0, insertIdx);
+  const after = lines.slice(insertIdx);
+  while (before.length > 0 && before[before.length - 1].trim() === '') before.pop();
+
+  const merged = [...before, '', ...section.split('\n')];
+  if (after.length > 0) merged.push('', ...after);
+  return merged.join('\n');
+}
+
+/**
  * 詳細文（announcement）から指定した見出し（例: '■イベント・オフ会内容'）のセクション本文を抜き出す。
  * 見出しが見つからない場合は空文字を返す。
  */

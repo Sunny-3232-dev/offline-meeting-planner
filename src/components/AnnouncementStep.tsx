@@ -12,6 +12,8 @@ interface AnnouncementStepProps {
   onRegenerate: (feedback: string) => void;
   /** これまでに蓄積された「書き直してほしい点」の履歴（オフ会ごと） */
   feedbackHistory?: string[];
+  /** 進行イメージから自動挿入される「■当日の流れ」セクション（空なら挿入なし） */
+  timetableSection?: string;
   onNext: () => void;
   onBack: () => void;
 }
@@ -23,6 +25,7 @@ export default function AnnouncementStep({
   onChange,
   onRegenerate,
   feedbackHistory = [],
+  timetableSection = '',
   onNext,
   onBack,
 }: AnnouncementStepProps) {
@@ -53,6 +56,20 @@ export default function AnnouncementStep({
             />
           </div>
           <p className="text-xs text-slate-400 mb-4">{announcement.length}文字</p>
+
+          {timetableSection && (
+            <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 mb-4">
+              <p className="text-xs font-semibold text-sky-700 mb-1.5">
+                進行イメージから自動で追記されます（チャット作成時のコピーに含まれます）
+              </p>
+              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                {timetableSection}
+              </p>
+              <p className="mt-1.5 text-[11px] text-sky-600/70">
+                内容を変えたい場合は進行イメージのステップで編集してください。載せたくない場合も進行イメージのステップでOFFにできます
+              </p>
+            </div>
+          )}
 
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-8">
             <label htmlFor="announcementFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">

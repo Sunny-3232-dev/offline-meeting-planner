@@ -11,6 +11,9 @@ interface ScheduleStepProps {
   onRegenerate: (feedback: string) => void;
   /** これまでに蓄積された「作り直してほしい点」の履歴（オフ会ごと） */
   feedbackHistory?: string[];
+  /** 進行イメージ（時刻＋項目名）を詳細（公開情報）に載せるか */
+  includeTimetable: boolean;
+  onChangeIncludeTimetable: (value: boolean) => void;
   onNext: () => void;
   onBack: () => void;
 }
@@ -28,6 +31,8 @@ export default function ScheduleStep({
   onChange,
   onRegenerate,
   feedbackHistory = [],
+  includeTimetable,
+  onChangeIncludeTimetable,
   onNext,
   onBack,
 }: ScheduleStepProps) {
@@ -189,6 +194,25 @@ export default function ScheduleStep({
         >
           合計 {total}分 / 予定 {basics.durationMinutes}分
           {diff === 0 ? '（ぴったり！）' : diff > 0 ? `（${diff}分オーバー）` : `（あと${-diff}分空きあり）`}
+        </div>
+      )}
+
+      {schedule.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-6 -mt-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeTimetable}
+              onChange={(e) => onChangeIncludeTimetable(e.target.checked)}
+              className="mt-0.5 w-4 h-4 accent-sky-600 shrink-0"
+            />
+            <span className="text-sm text-slate-700">
+              この進行を詳細（公開情報）にも載せる
+              <span className="block text-xs text-slate-400 mt-0.5">
+                時刻と項目名だけが「■当日の流れ」として自動で入ります（進行メモは載りません）。ここを編集すると自動で反映されます
+              </span>
+            </span>
+          </label>
         </div>
       )}
 

@@ -143,6 +143,8 @@ export interface EventSnapshot {
   ideasFeedbackHistory: string[];
   /** 告知文（支部チャット・つぶやき）の「書き直してほしい点」の蓄積履歴（オフ会ごと） */
   shareFeedbackHistory: string[];
+  /** 進行イメージ（時刻＋項目名）を詳細（公開情報）に載せるか（既定ON） */
+  includeTimetableInAnnouncement: boolean;
 }
 
 export interface SavedEvent {

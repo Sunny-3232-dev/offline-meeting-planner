@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   AppStep,
   OrganizerProfile,
@@ -42,7 +42,7 @@ import {
   generateThumbnailAssets,
   generateShareTexts,
 } from './services/geminiService';
-import { formatDateJa, removeTimetableSection } from './utils/time';
+import { formatDateJa, removeTimetableSection, buildTimetableSection, insertTimetableSection } from './utils/time';
 import { MAX_PINNED_IDEAS, MAX_SAVED_EVENTS, officeLabel } from './constants';
 import StepIndicator, { stepOrder } from './components/StepIndicator';
 import LoadingOverlay from './components/LoadingOverlay';
@@ -269,9 +269,24 @@ function AppContent() {
   const [shareFeedbackHistory, setShareFeedbackHistory] = useState<string[]>(
     () => loadFromStorage<string[]>('shareFeedbackHistory') || []
   );
+  // 進行イメージ（時刻＋項目名）を詳細（公開情報）に載せるか（既定ON）
+  const [includeTimetable, setIncludeTimetable] = useState<boolean>(
+    () => loadFromStorage<boolean>('includeTimetableInAnnouncement') ?? true
+  );
 
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
+
+  // 進行イメージ（時刻＋項目名）から公開用の「■当日の流れ」セクションを組み立てる
+  const timetableSection = useMemo(
+    () => (includeTimetable ? buildTimetableSection(basics.startTime, schedule) : ''),
+    [includeTimetable, basics.startTime, schedule]
+  );
+  // チャット作成フォームへ貼る公開用の詳細文（トグルONなら当日の流れを自動挿入）
+  const announcementForPublish = useMemo(
+    () => (announcement && timetableSection ? insertTimetableSection(announcement, timetableSection) : announcement),
+    [announcement, timetableSection]
+  );
 
   // 詳細（公開情報）ステップに入るたびに「■当日の流れ」セクションが残っていないか掃除する。
   // 当日の流れは主催者だけが進行イメージのページで見る情報にし、公開情報には載せない。
@@ -350,6 +365,7 @@ function AppContent() {
   useEffect(() => { saveToStorage('scheduleFeedbackHistory', scheduleFeedbackHistory); }, [scheduleFeedbackHistory]);
   useEffect(() => { saveToStorage('ideasFeedbackHistory', ideasFeedbackHistory); }, [ideasFeedbackHistory]);
   useEffect(() => { saveToStorage('shareFeedbackHistory', shareFeedbackHistory); }, [shareFeedbackHistory]);
+  useEffect(() => { saveToStorage('includeTimetableInAnnouncement', includeTimetable); }, [includeTimetable]);
 
   // 編集中のオフ会スナップショットを保存済みイベントに同期
   useEffect(() => {
@@ -374,11 +390,12 @@ function AppContent() {
       scheduleFeedbackHistory,
       ideasFeedbackHistory,
       shareFeedbackHistory,
+      includeTimetableInAnnouncement: includeTimetable,
     };
     setEvents((prev) =>
       prev.map((ev) => (ev.id === activeEventId ? { ...ev, updatedAt: Date.now(), snapshot } : ev))
     );
-  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory, ideasFeedbackHistory, shareFeedbackHistory]);
+  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory, ideasFeedbackHistory, shareFeedbackHistory, includeTimetable]);
 
   const goToStep = useCallback((next: AppStep) => {
     setStep(next);
@@ -427,6 +444,7 @@ function AppContent() {
     setScheduleFeedbackHistory([]);
     setIdeasFeedbackHistory([]);
     setShareFeedbackHistory([]);
+    setIncludeTimetable(true);
   }, []);
 
   const handleReset = useCallback(async () => {
@@ -509,6 +527,7 @@ function AppContent() {
     setScheduleFeedbackHistory(s.scheduleFeedbackHistory || []);
     setIdeasFeedbackHistory(s.ideasFeedbackHistory || []);
     setShareFeedbackHistory(s.shareFeedbackHistory || []);
+    setIncludeTimetable(s.includeTimetableInAnnouncement ?? true);
     setStep(s.maxReached || AppStep.BASICS);
   }, [events]);
 
@@ -904,6 +923,7 @@ function AppContent() {
                       scheduleFeedbackHistory: [],
                       ideasFeedbackHistory,
                       shareFeedbackHistory: [],
+                      includeTimetableInAnnouncement: includeTimetable,
                     },
                   },
                 ]);
@@ -980,6 +1000,8 @@ function AppContent() {
             onChange={setSchedule}
             onRegenerate={(feedback) => runGenerateSchedule({ confirm: true, feedback })}
             feedbackHistory={scheduleFeedbackHistory}
+            includeTimetable={includeTimetable}
+            onChangeIncludeTimetable={setIncludeTimetable}
             onNext={async () => {
               // 詳細（公開情報）にタイムテーブルは載せないため、scheduleの変更はここでは影響しない
               if (!announcement) {
@@ -1019,6 +1041,7 @@ function AppContent() {
             onChange={setAnnouncement}
             onRegenerate={runGenerateAnnouncement}
             feedbackHistory={announcementFeedbackHistory}
+            timetableSection={timetableSection}
             onNext={() => {
               goToStep(AppStep.IMAGE_PROMPTS);
               // 先行生成が失敗していた場合のフォールバック（バックグラウンドで再試行）
@@ -1046,7 +1069,7 @@ function AppContent() {
         return (
           <ChatSetupStep
             basics={basics}
-            announcement={announcement}
+            announcement={announcementForPublish}
             eventTags={eventTags}
             onNext={async () => {
               // 詳細（公開情報）を書き直した後だと、既存の展開用文章は前提が食い違っている可能性がある
