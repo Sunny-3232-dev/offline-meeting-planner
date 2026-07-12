@@ -797,7 +797,8 @@ function AppContent() {
             profile={profile}
             onChange={setProfile}
             // 2回目以降に押しても常に初期化・再生成する（古い企画案を暗黙に使い回さない）
-            onNext={runGenerateIdeas}
+            // 引数なしで呼ぶこと（ProfileInput側のonClickイベントをfeedbackとして渡さないため）
+            onNext={() => runGenerateIdeas()}
           />
         );
       case AppStep.IDEAS:
