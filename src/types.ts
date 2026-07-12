@@ -139,6 +139,8 @@ export interface EventSnapshot {
   announcementFeedbackHistory: string[];
   /** 進行イメージの「作り直してほしい点」の蓄積履歴（オフ会ごと） */
   scheduleFeedbackHistory: string[];
+  /** 企画案の「こういうのがいい」の蓄積履歴（オフ会ごと） */
+  ideasFeedbackHistory: string[];
 }
 
 export interface SavedEvent {

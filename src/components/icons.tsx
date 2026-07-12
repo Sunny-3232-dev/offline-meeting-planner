@@ -208,12 +208,11 @@ export function MicIcon({ className = '', size = 24 }: IconProps) {
   );
 }
 
-export function LanternIcon({ className = '', size = 24, lit = false }: IconProps & { lit?: boolean }) {
+export function PinIcon({ className = '', size = 24, lit = false }: IconProps & { lit?: boolean }) {
   return (
-    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3c2.4 2.6 4 4.8 4 7a4 4 0 1 1-8 0c0-2.2 1.6-4.4 4-7z" fill={lit ? '#fef3c7' : 'none'} />
-      <path d="M12 14v6" />
-      <path d="M9 20h6" />
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill={lit ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
     </svg>
   );
 }

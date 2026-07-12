@@ -242,10 +242,18 @@ function communityToneNote(profile: OrganizerProfile): string {
   return '- リベシティでは「初心者歓迎」を明記した対面の気軽な会が多く開催され、参加のハードルを下げて人が集まりやすくなっている。企画案にもこの空気感を活かしてよいが、対面では安全・トラブル防止のため「途中参加・退出OK」を安易に前提にしないこと（集合・解散のタイミングを明確にする企画にすること）';
 }
 
+/** 企画案の「こういうのがいい」フィードバック履歴をプロンプト用の文言にする */
+function ideasFeedbackSection(feedbackHistory: string[]): string {
+  if (feedbackHistory.length === 0) return '';
+  const lines = feedbackHistory.map((f, i) => `${i + 1}. ${f}`).join('\n');
+  return `\n## 主催者からの追加の要望（すべて反映すること）\n${lines}\n`;
+}
+
 async function generateIdeasForCategory(
   apiKey: string,
   profile: OrganizerProfile,
-  category: { id: IdeaCategory; label: string; direction: string }
+  category: { id: IdeaCategory; label: string; direction: string },
+  feedbackHistory: string[]
 ): Promise<PlanIdea[]> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 初めてオフ会を主催する人のために、「${category.label}」のオフ会企画案を${IDEAS_PER_CATEGORY}件提案してください。
@@ -258,6 +266,7 @@ ${category.direction}
 - 興味・好きなこと: ${profile.interests}
 - 開催したいエリア: ${profile.desiredArea || '未記入'}
 ${venuePreferenceDirective(profile)}
+${ideasFeedbackSection(feedbackHistory)}
 
 ## 各フィールドの意味
 - title: 企画名（30文字以内。参加者が内容をイメージできる具体的な名前）
@@ -272,6 +281,7 @@ ${venuePreferenceDirective(profile)}
 - 初主催者が「これならできそう」と思える、運営が簡単な企画を優先すること
 ${communityToneNote(profile)}
 - 会場手配・機材・事前準備のハードルが高い企画は避けること
+${feedbackHistory.length > 0 ? '- 「主催者からの追加の要望」は、当たり障りのない範囲に薄めず、要望の意図どおりに企画へ反映すること\n' : ''}
 - ${IDEAS_PER_CATEGORY}件はテーマ・時間帯にバリエーションを持たせること
 - 主催者の個性やニッチな趣味に引っ張られすぎないこと。初主催者は突飛な会だと立てづらいので、まずは「${category.label}」というお金のテーマに沿った王道・定番の形（上記「${category.label}とは」の例のような、参加者がイメージしやすく集まりやすい形）を優先する
 - 興味・好きなことは、会話のきっかけや切り口として“軽く”反映する程度でよい（企画の主役をニッチな個性にしない）
@@ -317,7 +327,11 @@ ${communityToneNote(profile)}
 }
 
 /** 主催者が既にテーマを決めている場合: そのテーマに沿った企画案を5件だけ生成 */
-async function generateThemedIdeas(apiKey: string, profile: OrganizerProfile): Promise<PlanIdea[]> {
+async function generateThemedIdeas(
+  apiKey: string,
+  profile: OrganizerProfile,
+  feedbackHistory: string[]
+): Promise<PlanIdea[]> {
   const prompt = `あなたはリベシティ（オンラインコミュニティ）のオフ会企画をサポートするAIです。
 主催者は既にテーマを決めています: 「${profile.plannedTheme}」。
 このテーマ・この表現に忠実な企画案を${THEME_IDEAS_COUNT}件提案してください。あなたの仕事はテーマを考えることではなく、主催者が決めたテーマを開催可能な形に具体化することだけです。
@@ -327,6 +341,7 @@ async function generateThemedIdeas(apiKey: string, profile: OrganizerProfile): P
 - 興味・好きなこと: ${profile.interests}
 - 開催したいエリア: ${profile.desiredArea || '未記入'}
 ${venuePreferenceDirective(profile)}
+${ideasFeedbackSection(feedbackHistory)}
 
 ## 各フィールドの意味
 - title: 企画名（30文字以内。参加者が内容をイメージできる具体的な名前）
@@ -338,7 +353,7 @@ ${venuePreferenceDirective(profile)}
 - firstTimerFriendlyPoint: 初主催でもやりやすい理由（60文字以内）
 
 ## 注意事項（テーマへの忠実性が最優先）
-- ${THEME_IDEAS_COUNT}件すべてが、主催者の決めたテーマ「${profile.plannedTheme}」の企画であること。テーマを外れた案・別ジャンルの案は1件も混ぜないこと
+${feedbackHistory.length > 0 ? '- 「主催者からの追加の要望」は、当たり障りのない範囲に薄めず、要望の意図どおりに企画へ反映すること（テーマへの忠実性と両立させること）\n' : ''}- ${THEME_IDEAS_COUNT}件すべてが、主催者の決めたテーマ「${profile.plannedTheme}」の企画であること。テーマを外れた案・別ジャンルの案は1件も混ぜないこと
 - titleには原則、主催者が書いたテーマの言葉（キーワード）を**一字一句正確にコピーして**含めること。文字の脱落・変更は厳禁（例:「スキルマ」を「スキマ」と書かない）。別の言葉への言い換え・置き換えも禁止（例: テーマが「ボドゲ会」なら「ボドゲ」をタイトルに残す。「テーブルゲーム交流会」等に言い換えない）
 - summary・purposeでも主催者の表現・ニュアンスを尊重し、勝手に上位概念・別テーマへ拡大解釈しないこと
 - ${THEME_IDEAS_COUNT}件の違いは「切り口・進め方・時間帯・対象の絞り方」だけで出すこと。テーマそのものは変えないこと
@@ -387,15 +402,16 @@ ${communityToneNote(profile)}
 
 export async function generatePlanIdeas(
   apiKey: string,
-  profile: OrganizerProfile
+  profile: OrganizerProfile,
+  feedbackHistory: string[] = []
 ): Promise<PlanIdea[]> {
   // 主催者が既にテーマを決めている場合は、そのテーマに沿った案を5件だけ生成
   if (profile.plannedTheme && profile.plannedTheme.trim()) {
-    return generateThemedIdeas(apiKey, profile);
+    return generateThemedIdeas(apiKey, profile, feedbackHistory);
   }
   // 空の場合は従来どおり王道系・テーマ系を並列生成（片方が失敗しても全滅させない）
   const results = await Promise.allSettled(
-    IDEA_CATEGORIES.map((c) => generateIdeasForCategory(apiKey, profile, c))
+    IDEA_CATEGORIES.map((c) => generateIdeasForCategory(apiKey, profile, c, feedbackHistory))
   );
   const ideas = results
     .filter((r): r is PromiseFulfilledResult<PlanIdea[]> => r.status === 'fulfilled')

@@ -261,6 +261,10 @@ function AppContent() {
   const [scheduleFeedbackHistory, setScheduleFeedbackHistory] = useState<string[]>(
     () => loadFromStorage<string[]>('scheduleFeedbackHistory') || []
   );
+  // 企画案の「こういうのがいい」の蓄積履歴（オフ会ごと）
+  const [ideasFeedbackHistory, setIdeasFeedbackHistory] = useState<string[]>(
+    () => loadFromStorage<string[]>('ideasFeedbackHistory') || []
+  );
 
   // Scroll to top on step change
   useEffect(() => { window.scrollTo({ top: 0 }); }, [step]);
@@ -340,6 +344,7 @@ function AppContent() {
   useEffect(() => { saveToStorage('shareSourceKey', shareSourceKey); }, [shareSourceKey]);
   useEffect(() => { saveToStorage('announcementFeedbackHistory', announcementFeedbackHistory); }, [announcementFeedbackHistory]);
   useEffect(() => { saveToStorage('scheduleFeedbackHistory', scheduleFeedbackHistory); }, [scheduleFeedbackHistory]);
+  useEffect(() => { saveToStorage('ideasFeedbackHistory', ideasFeedbackHistory); }, [ideasFeedbackHistory]);
 
   // 編集中のオフ会スナップショットを保存済みイベントに同期
   useEffect(() => {
@@ -362,11 +367,12 @@ function AppContent() {
       shareSourceKey,
       announcementFeedbackHistory,
       scheduleFeedbackHistory,
+      ideasFeedbackHistory,
     };
     setEvents((prev) =>
       prev.map((ev) => (ev.id === activeEventId ? { ...ev, updatedAt: Date.now(), snapshot } : ev))
     );
-  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory]);
+  }, [activeEventId, activeIdea, concept, basics, schedule, announcement, eventTags, iconPrompt, thumbnailAssets, shareTexts, offkaiChatUrl, maxReached, scheduleSourceKey, imagesSourceKey, announcementSourceKey, shareSourceKey, announcementFeedbackHistory, scheduleFeedbackHistory, ideasFeedbackHistory]);
 
   const goToStep = useCallback((next: AppStep) => {
     setStep(next);
@@ -413,6 +419,7 @@ function AppContent() {
     setShareSourceKey('');
     setAnnouncementFeedbackHistory([]);
     setScheduleFeedbackHistory([]);
+    setIdeasFeedbackHistory([]);
   }, []);
 
   const handleReset = useCallback(async () => {
@@ -493,6 +500,7 @@ function AppContent() {
     setShareSourceKey(s.shareSourceKey || '');
     setAnnouncementFeedbackHistory(s.announcementFeedbackHistory || []);
     setScheduleFeedbackHistory(s.scheduleFeedbackHistory || []);
+    setIdeasFeedbackHistory(s.ideasFeedbackHistory || []);
     setStep(s.maxReached || AppStep.BASICS);
   }, [events]);
 
@@ -734,24 +742,28 @@ function AppContent() {
     }
   }, [apiKey, announcement, basics, profile, ensureApiKey]);
 
-  const runGenerateIdeas = useCallback(async () => {
+  /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
+  const runGenerateIdeas = useCallback(async (feedback?: string) => {
     if (!ensureApiKey()) return;
+    const trimmed = feedback?.trim();
+    const nextHistory = trimmed ? [...ideasFeedbackHistory, trimmed] : ideasFeedbackHistory;
     setLoading(true);
     setLoadingMessage('企画のアイデアを考えています...');
     setLoadingSourceText(`${profile.selfIntro} ${profile.interests}`);
     setError(null);
     try {
-      const ideas = await generatePlanIdeas(apiKey, profile);
+      const ideas = await generatePlanIdeas(apiKey, profile, nextHistory);
       // ピン留めした案は再生成後も残す
       setPlanIdeas((prev) => [...prev.filter((i) => pinnedIds.includes(i.id)), ...ideas]);
       setSelectedIdeaId((prev) => (prev && pinnedIds.includes(prev) ? prev : null));
+      if (trimmed) setIdeasFeedbackHistory(nextHistory);
       goToStep(AppStep.IDEAS);
     } catch (e: any) {
       setError(e?.message || '企画案の生成に失敗しました。');
     } finally {
       setLoading(false);
     }
-  }, [apiKey, profile, pinnedIds, ensureApiKey, goToStep]);
+  }, [apiKey, profile, pinnedIds, ideasFeedbackHistory, ensureApiKey, goToStep]);
 
   const togglePin = useCallback((id: string) => {
     setPinnedIds((prev) => {
@@ -798,6 +810,7 @@ function AppContent() {
             onSelect={setSelectedIdeaId}
             onTogglePin={togglePin}
             onRegenerate={runGenerateIdeas}
+            feedbackHistory={ideasFeedbackHistory}
             onProceed={async (idea) => {
               // 保存枠の空きを確認（編集中のオフ会があればその枠を使う）
               if (!activeEventId && events.length >= MAX_SAVED_EVENTS) {
@@ -874,6 +887,7 @@ function AppContent() {
                       shareSourceKey: '',
                       announcementFeedbackHistory: [],
                       scheduleFeedbackHistory: [],
+                      ideasFeedbackHistory,
                     },
                   },
                 ]);

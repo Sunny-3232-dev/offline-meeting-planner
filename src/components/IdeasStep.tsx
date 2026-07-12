@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PlanIdea, IdeaCategory, normalizeIdeaCategory } from '../types';
 import { MAX_PINNED_IDEAS } from '../constants';
-import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, LanternIcon, UserIcon, SproutIcon, GroupIcon, BookOpenIcon, PenToolIcon, KeyIcon, KanpaiIcon } from './icons';
+import { ArrowRightIcon, ChevronLeftIcon, RefreshIcon, CheckIcon, PinIcon, UserIcon, SproutIcon, GroupIcon, BookOpenIcon, PenToolIcon, KeyIcon, KanpaiIcon } from './icons';
 
 interface IdeasStepProps {
   ideas: PlanIdea[];
@@ -11,7 +11,10 @@ interface IdeasStepProps {
   plannedTheme?: string;
   onSelect: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onRegenerate: () => void;
+  /** feedbackが空文字の場合は同条件での作り直し、それ以外は要望を反映して作り直す */
+  onRegenerate: (feedback: string) => void;
+  /** これまでに蓄積された「こういうのがいい」の履歴（オフ会ごと） */
+  feedbackHistory?: string[];
   /** カードのダブルクリック or 下部ボタンで、その企画に決めて基本情報へ */
   onProceed: (idea: PlanIdea) => void;
   onBack: () => void;
@@ -126,7 +129,7 @@ function IdeaCard({
               : 'bg-white/80 text-slate-400 opacity-70 hover:opacity-100 hover:text-amber-500'
         }`}
       >
-        <LanternIcon size={16} lit={isPinned} />
+        <PinIcon size={16} lit={isPinned} />
       </button>
 
       <div className="flex items-start gap-2 mb-1.5 pr-7">
@@ -164,12 +167,19 @@ export default function IdeasStep({
   onSelect,
   onTogglePin,
   onRegenerate,
+  feedbackHistory = [],
   onProceed,
   onBack,
 }: IdeasStepProps) {
   const selectedIdea = ideas.find((i) => i.id === selectedIdeaId) || null;
   const pinnedIdeas = ideas.filter((i) => pinnedIds.includes(i.id));
   const pinLimitReached = pinnedIds.length >= MAX_PINNED_IDEAS;
+  const [feedback, setFeedback] = useState('');
+
+  const handleRegenerate = () => {
+    onRegenerate(feedback);
+    setFeedback('');
+  };
 
   const renderCard = (idea: PlanIdea) => (
     <React.Fragment key={idea.id}>
@@ -195,14 +205,14 @@ export default function IdeasStep({
           : 'あなたのプロフィールをもとに、お金の5つのテーマ（貯める・稼ぐ・守る・増やす・使う）と、その他の会を提案しました。'}
       </p>
       <p className="text-xs text-slate-400 mb-6">
-        気になった案は灯マークでピン留め（最大{MAX_PINNED_IDEAS}件・「別の案を出す」でも消えません）／ カードを<b>ダブルクリック</b>するとその企画に決めて次へ進みます
+        気になった案はピンマークでピン留め（最大{MAX_PINNED_IDEAS}件・「別の案を出す」でも消えません）／ カードを<b>ダブルクリック</b>するとその企画に決めて次へ進みます
       </p>
 
       {/* ピン留め */}
       {pinnedIdeas.length > 0 && (
         <section className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-amber-500" aria-hidden="true"><LanternIcon size={17} lit /></span>
+            <span className="text-amber-500" aria-hidden="true"><PinIcon size={17} lit /></span>
             <h3 className="font-bold text-amber-700">ピン留め</h3>
             <p className="text-xs text-slate-400">{pinnedIdeas.length} / {MAX_PINNED_IDEAS}件</p>
           </div>
@@ -226,7 +236,33 @@ export default function IdeasStep({
         );
       })}
 
-      <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 mt-10">
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mt-10 mb-6">
+        <label htmlFor="ideasFeedback" className="block text-xs font-semibold text-slate-600 mb-1.5">
+          AIに「こういうのがいい」を伝えてから、別の案を出す（任意）
+        </label>
+        {feedbackHistory.length > 0 && (
+          <p className="text-[11px] text-slate-400 mb-2">
+            これまでに伝えた指示（{feedbackHistory.length}件）を踏まえて提案します: {feedbackHistory.join(' / ')}
+          </p>
+        )}
+        <textarea
+          id="ideasFeedback"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          rows={2}
+          placeholder="例: もっと少人数向けがいい／土日開催前提で／初心者がとっつきやすいテーマがいい"
+          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-400 bg-white mb-2"
+        />
+        <button
+          onClick={handleRegenerate}
+          className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+        >
+          <RefreshIcon size={13} />
+          別の案を出す（ピン留めは残ります）
+        </button>
+      </div>
+
+      <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -234,13 +270,6 @@ export default function IdeasStep({
           >
             <ChevronLeftIcon size={16} />
             プロフィールに戻る
-          </button>
-          <button
-            onClick={onRegenerate}
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-white border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors"
-          >
-            <RefreshIcon size={15} />
-            別の案を出す（ピン留めは残ります）
           </button>
         </div>
         <button
