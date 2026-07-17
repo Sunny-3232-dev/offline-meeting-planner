@@ -31,16 +31,24 @@ function buildOviceEventText(basics: EventBasics, announcement: string, organize
   ].join('\n');
 }
 
-/** つぶやき本文 + オフ会チャットURL（任意）を結合して最終テキストを得る */
-function buildTweetText(body: string, chatUrl: string): string {
-  const url = chatUrl.trim();
-  return url ? `${body.trim()}\n${url}` : body.trim();
-}
+const CHAT_URL_PLACEHOLDER = '{チャットURL}';
 
-/** 本文 + URL（任意）を改行2つで結合する（支部チャット向けの長文用） */
-function appendUrl(text: string, url: string): string {
-  const trimmedUrl = url.trim();
-  return trimmedUrl ? `${text.trim()}\n\n${trimmedUrl}` : text.trim();
+/**
+ * 本文中の {チャットURL} プレースホルダーを実際のURLに置き換える。
+ * URL未入力ならプレースホルダー行を取り除く。
+ * プレースホルダーが無い旧データは従来どおり末尾にURLを付ける。
+ */
+function applyChatUrl(text: string, chatUrl: string): string {
+  const url = chatUrl.trim();
+  if (text.includes(CHAT_URL_PLACEHOLDER)) {
+    if (url) return text.split(CHAT_URL_PLACEHOLDER).join(url).trim();
+    return text
+      .split('\n')
+      .filter((l) => l.trim() !== CHAT_URL_PLACEHOLDER)
+      .join('\n')
+      .trim();
+  }
+  return url ? `${text.trim()}\n\n${url}` : text.trim();
 }
 
 /** 本文プリセット済みのつぶやき作成画面URL（既存ツールと同じ導線） */
@@ -118,7 +126,7 @@ export default function ShareStep({
   onBack,
   onFinish,
 }: ShareStepProps) {
-  const tweetFinal = shareTexts ? buildTweetText(shareTexts.tweet, offkaiChatUrl) : '';
+  const tweetFinal = shareTexts ? applyChatUrl(shareTexts.tweet, offkaiChatUrl) : '';
   const [feedback, setFeedback] = useState('');
 
   const handleRegenerate = () => {
@@ -183,7 +191,10 @@ export default function ShareStep({
               <CopyCard
                 title="oViceチャット向け（公式テンプレート形式）"
                 hint="上のボタンでoViceチャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
-                text={appendUrl(oviceText, offkaiChatUrl)}
+                text={applyChatUrl(
+                  `${oviceText}\n\n🌟参加希望の方はこちらのチャットから参加申請をお願いします！\n${'{チャットURL}'}`,
+                  offkaiChatUrl
+                )}
               />
             </>
           ) : (
@@ -229,7 +240,7 @@ export default function ShareStep({
               <CopyCard
                 title={`${branch ? branch.name : `${region || '地域'}支部`}チャット向け`}
                 hint="上のボタンで支部チャットを開き、この文章を貼り付けてください（オフ会チャットのリンクも自動で末尾に付きます）"
-                text={appendUrl(shareTexts.regionalChat, offkaiChatUrl)}
+                text={applyChatUrl(shareTexts.regionalChat, offkaiChatUrl)}
               />
             </>
           )}
